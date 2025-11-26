@@ -48,6 +48,5 @@ lib/generated_plugin_registrant.dart
 # Coverage
 coverage/
 
-# Generated files
-*.g.dart
+# Generated files (keep lib/models/*.g.dart for Hive adapters)
 *.freezed.dart
