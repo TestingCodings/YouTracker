@@ -33,6 +33,13 @@ dependencies:
   # UI
   cupertino_icons: ^1.0.8
   google_fonts: ^6.2.1
+  
+  # Google OAuth & YouTube API
+  google_sign_in: ^6.2.2
+  googleapis: ^13.2.0
+  http: ^1.2.2
+  flutter_secure_storage: ^9.2.2
+  retry: ^3.1.2
 
 dev_dependencies:
   flutter_test:
