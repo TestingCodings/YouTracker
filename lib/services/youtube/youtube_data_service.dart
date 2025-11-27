@@ -64,8 +64,17 @@ class YouTubeVideo {
       }
     }
 
+    // Handle both direct video ID and nested ID structure from search results
+    String videoId = '';
+    final jsonId = json['id'];
+    if (jsonId is String) {
+      videoId = jsonId;
+    } else if (jsonId is Map<String, dynamic>) {
+      videoId = jsonId['videoId'] as String? ?? '';
+    }
+
     return YouTubeVideo(
-      id: json['id'] is String ? json['id'] : (json['id']['videoId'] ?? ''),
+      id: videoId,
       title: snippet['title'] as String? ?? '',
       description: snippet['description'] as String? ?? '',
       thumbnailUrl: thumbnailUrl,

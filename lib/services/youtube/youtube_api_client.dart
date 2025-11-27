@@ -77,6 +77,9 @@ class RetryConfig {
   /// Multiplier for exponential backoff.
   final double backoffMultiplier;
 
+  /// Random instance for jitter calculation.
+  static final Random _random = Random();
+
   const RetryConfig({
     this.maxRetries = 3,
     this.initialDelay = const Duration(seconds: 1),
@@ -90,7 +93,7 @@ class RetryConfig {
         pow(backoffMultiplier, attempt).toInt();
     final cappedDelay = min(delay, maxDelay.inMilliseconds);
     // Add jitter (±25% of delay) to prevent thundering herd
-    final jitter = (cappedDelay * 0.25 * (Random().nextDouble() * 2 - 1)).toInt();
+    final jitter = (cappedDelay * 0.25 * (_random.nextDouble() * 2 - 1)).toInt();
     return Duration(milliseconds: cappedDelay + jitter);
   }
 }

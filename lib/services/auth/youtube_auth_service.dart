@@ -208,9 +208,11 @@ class YouTubeAuthService {
       final tokenExpiry = DateTime.now().add(const Duration(hours: 1));
 
       // Store tokens
+      // Note: Google Sign-In uses signInSilently() for token refresh,
+      // not traditional refresh tokens. We store null for refreshToken.
       await _tokenStorage.saveTokens(
         accessToken: auth.accessToken!,
-        refreshToken: auth.idToken, // Note: Google Sign-In doesn't provide refresh token directly
+        refreshToken: null,
         expiry: tokenExpiry,
         scopes: YouTubeScopes.defaultScopes,
       );
