@@ -6,18 +6,123 @@ A Flutter application for tracking and analyzing YouTube comments. Replace the c
 
 - **YouTube OAuth Integration**: Sign in with Google to access your YouTube channel
 - **Real YouTube Data API v3**: Fetch comments, videos, and channel data from YouTube
+- **Offline-First Architecture**: Full bidirectional sync with conflict resolution
 - **Login Screen**: Email/password authentication with Google sign-in option
 - **Dashboard**: Browse comments with search functionality and pagination
 - **Comment Details**: View detailed comment information with interactions
 - **Settings**: Configure theme, notifications, sync settings, and account management
 - **Dark/Light Theme**: Toggle between dark and light modes
-- **Local Storage**: Offline-first with Hive database
-- **Incremental Sync**: Only fetch new comments since last sync
+- **Local Storage**: Hive database as single source of truth
+- **Bidirectional Sync**: Push local changes and pull remote updates
+- **Conflict Resolution**: Intelligent field-level merging with pluggable strategies
+- **Delta Updates**: Efficient sync using ETags and updatedAfter timestamps
+- **Persistent Sync Queue**: Reliable offline operations with retry logic
 - **Rate Limit Handling**: Automatic retry with exponential backoff
 - **Push Notifications**: Stub implementation for future backend integration
 - **Background Sync**: Automatic data synchronization (configurable intervals)
+- **Sync Status UI**: Real-time sync progress indicator and detailed status page
 - **Riverpod State Management**: Reactive state management throughout the app
 - **GoRouter Navigation**: Clean, type-safe routing
+
+## Offline-First Architecture
+
+YouTracker implements a full offline-first architecture with bidirectional sync:
+
+### Core Components
+
+1. **SyncEngine** (`lib/src/sync/sync_engine.dart`)
+   - Main orchestrator for all sync operations
+   - Handles push (local→remote) and pull (remote→local) flows
+   - Manages background sync scheduling
+   - Monitors network connectivity for automatic sync on reconnect
+
+2. **SyncQueue** (`lib/src/sync/sync_queue.dart`)
+   - Persistent queue using Hive for offline operations
+   - Automatic retry with exponential backoff and jitter
+   - Dead letter queue for failed operations
+   - Cancellation of contradictory operations (e.g., create then delete)
+
+3. **ConflictResolver** (`lib/src/sync/conflict_resolver.dart`)
+   - Field-level merge for comment entities
+   - Pluggable resolution strategies (remoteWins, localWins, lastWriteWins, fieldLevelMerge)
+   - Tombstone handling for deletions
+   - Preserves local-only state (bookmarks)
+
+4. **RemoteDeltaClient** (`lib/src/sync/remote_delta_client.dart`)
+   - Delta sync using ETags and If-None-Match headers
+   - UpdatedAfter timestamps for incremental pulls
+   - Caches sync state for efficient requests
+
+### Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        User Action                               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Offline Repository                            │
+│  - Write to Hive immediately (source of truth)                   │
+│  - Enqueue SyncOperation if network needed                       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       SyncEngine                                 │
+│  ┌─────────────────┐              ┌─────────────────────────┐   │
+│  │   Push Flow     │              │      Pull Flow          │   │
+│  │  - Process Queue│              │  - Fetch delta updates  │   │
+│  │  - Retry failed │              │  - Resolve conflicts    │   │
+│  │  - Update Hive  │              │  - Merge into Hive      │   │
+│  └─────────────────┘              └─────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    YouTube Data API v3                           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Conflict Resolution Strategy
+
+When both local and remote have changes:
+
+1. **Text fields**: User's local edits have priority (preserved)
+2. **Counts (likes, replies)**: Use maximum value
+3. **Timestamps**: Use most recent
+4. **Bookmarks**: Always preserve local state (not synced)
+5. **Deletions**: Remote tombstones are respected
+
+### Sync Queue Configuration
+
+Configure via `SyncQueueConfig`:
+
+```dart
+SyncQueueConfig(
+  maxRetryAttempts: 5,          // Attempts before dead letter
+  backoffBaseSeconds: 2,        // Initial retry delay
+  maxBackoffSeconds: 300,       // Maximum delay cap
+  jitterFactor: 0.25,           // Randomization factor
+  maxConcurrentOperations: 3,   // Parallel operations limit
+  autoProcess: true,            // Auto-process on enqueue
+)
+```
+
+### SyncEngine Configuration
+
+Configure via `SyncEngineConfig`:
+
+```dart
+SyncEngineConfig(
+  syncInterval: Duration(minutes: 15),  // Background sync interval
+  maxConcurrentPush: 3,                 // Parallel push operations
+  maxRetryAttempts: 5,                  // Retry before failure
+  backoffBaseSeconds: 2,                // Retry delay base
+  enableBackgroundSync: true,           // Enable background sync
+  syncOnReconnect: true,                // Sync when network returns
+)
+```
 
 ## Project Structure
 
@@ -57,6 +162,27 @@ lib/
 │   ├── mock_data_service.dart # Mock data for development
 │   ├── notification_service.dart # Push notification stub
 │   └── services.dart         # Barrel export
+├── src/                      # Offline-first architecture
+│   ├── sync/                 # Sync engine components
+│   │   ├── sync_engine.dart  # Main sync orchestrator
+│   │   ├── sync_queue.dart   # Persistent operation queue
+│   │   ├── conflict_resolver.dart # Conflict resolution
+│   │   ├── hive_adapters.dart # Hive adapters for sync entities
+│   │   ├── remote_delta_client.dart # Delta sync client
+│   │   └── sync.dart         # Barrel export
+│   ├── repositories/         # Offline-first repositories
+│   │   ├── offline_comment_repository.dart # Comment repository
+│   │   └── repositories.dart # Barrel export
+│   ├── providers/            # Sync-related providers
+│   │   ├── sync_status_provider.dart # Sync status state
+│   │   └── providers.dart    # Barrel export
+│   └── ui/                   # Sync UI components
+│       ├── widgets/          # Sync widgets
+│       │   ├── sync_status_indicator.dart # AppBar indicator
+│       │   └── widgets.dart  # Barrel export
+│       └── pages/            # Sync pages
+│           ├── sync_status_page.dart # Detailed status page
+│           └── pages.dart    # Barrel export
 ├── theme/                    # Theming
 │   └── app_theme.dart        # Light and dark theme definitions
 ├── utils/                    # Utility functions
@@ -293,11 +419,53 @@ The app handles rate limits with:
 - [x] Implement OAuth2 for YouTube authentication
 - [x] Add rate limit handling with exponential backoff
 - [x] Add incremental sync for comments
+- [x] Implement offline-first architecture with bidirectional sync
+- [x] Add conflict resolution with field-level merging
+- [x] Add persistent sync queue with retry logic
+- [x] Add sync status UI indicator
 - [ ] Add Firebase backend for user data
 - [ ] Implement real push notifications
 - [ ] Add analytics and charts
 - [ ] Implement comment reply functionality
 - [ ] Add export/share features
+- [ ] Add Workmanager/background_fetch for native background sync
+
+## Migration Notes
+
+### Upgrading to Offline-First Architecture
+
+The offline-first architecture is backward compatible with existing installations:
+
+1. **Automatic Migration**: On first launch after upgrade, the app automatically:
+   - Creates new Hive boxes (`syncQueueBox`, `metadataBox`, `syncableEntityBox`)
+   - Migrates existing comments to include sync metadata
+   - Sets migration flag to prevent repeated migrations
+
+2. **No Data Loss**: All existing local data is preserved during migration.
+
+3. **Recovery Mode**: If local state becomes corrupt, use the "Force Full Sync" option in Settings > Sync Status to rebuild from remote.
+
+### Configuration Flags
+
+Environment variables or config file options:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `syncInterval` | 15 min | Background sync interval |
+| `maxConcurrentPush` | 3 | Parallel push operations |
+| `maxRetryAttempts` | 5 | Retries before dead letter |
+| `backoffBase` | 2 sec | Exponential backoff base |
+| `enableBackgroundSync` | true | Enable background sync |
+
+### Background Sync Setup (Future)
+
+Background sync will be implemented using:
+- **Android**: Workmanager for periodic background work
+- **iOS**: background_fetch / BackgroundTasks framework
+
+Platform setup will require:
+- Android: `android/app/src/main/AndroidManifest.xml` configuration
+- iOS: Enable Background Modes capability in Xcode
 
 ## Troubleshooting
 
