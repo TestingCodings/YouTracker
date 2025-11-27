@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/providers.dart';
+import '../src/providers/sync_status_provider.dart';
+import '../src/ui/widgets/sync_status_indicator.dart';
 import '../widgets/widgets.dart';
 
 /// Dashboard screen showing comments with search and pagination.
@@ -31,6 +33,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       appBar: AppBar(
         title: const Text('YouTracker'),
         actions: [
+          // Sync status indicator
+          SyncStatusIndicator(
+            onTap: () => context.push('/sync-status'),
+          ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () => _showNotificationsBottomSheet(context),
@@ -137,6 +143,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
+        // Trigger sync and refresh comments
+        final syncNotifier = ref.read(syncStatusProvider.notifier);
+        await syncNotifier.syncNow();
         await ref.read(commentsProvider.notifier).refresh();
       },
       child: ListView.builder(

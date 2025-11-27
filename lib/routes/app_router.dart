@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
 import '../screens/screens.dart';
 import '../services/services.dart';
+import '../src/ui/pages/sync_status_page.dart';
 
 /// GoRouter configuration for the app.
 final routerProvider = Provider<GoRouter>((ref) {
@@ -95,6 +96,26 @@ final routerProvider = Provider<GoRouter>((ref) {
           },
         ),
       ),
+      GoRoute(
+        path: '/sync-status',
+        name: 'syncStatus',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const SyncStatusPage(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOut,
+              )),
+              child: child,
+            );
+          },
+        ),
+      ),
     ],
     errorPageBuilder: (context, state) => MaterialPage(
       key: state.pageKey,
@@ -137,4 +158,5 @@ class AppRoutes {
   static const String dashboard = 'dashboard';
   static const String commentDetail = 'commentDetail';
   static const String settings = 'settings';
+  static const String syncStatus = 'syncStatus';
 }

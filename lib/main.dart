@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers/providers.dart';
 import 'routes/app_router.dart';
 import 'services/services.dart';
+import 'src/sync/sync_engine.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -11,6 +12,9 @@ void main() async {
 
   // Initialize local storage
   await LocalStorageService.instance.initialize();
+
+  // Initialize sync engine (offline-first architecture)
+  await SyncEngine.instance.initialize();
 
   // Initialize notification service (stub)
   await NotificationService.instance.initialize();
@@ -49,6 +53,12 @@ class _YouTrackerAppState extends ConsumerState<YouTrackerApp> {
 
     // Initialize settings
     await ref.read(settingsProvider.notifier).initialize();
+
+    // Start background sync if enabled
+    final settings = ref.read(settingsProvider);
+    if (settings.syncEnabled) {
+      SyncEngine.instance.startBackgroundSync();
+    }
   }
 
   @override

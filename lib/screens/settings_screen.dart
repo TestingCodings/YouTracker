@@ -131,6 +131,15 @@ class SettingsScreen extends ConsumerWidget {
                   }
                 },
               ),
+              SettingsTile(
+                icon: Icons.cloud_sync_outlined,
+                title: 'Sync Status',
+                subtitle: 'View sync queue and details',
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  context.push('/sync-status');
+                },
+              ),
             ],
           ),
 
