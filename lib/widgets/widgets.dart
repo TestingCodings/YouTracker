@@ -1,3 +1,4 @@
+export 'charts/charts.dart';
 export 'comment_card.dart';
 export 'common_widgets.dart';
 export 'interaction_tile.dart';
