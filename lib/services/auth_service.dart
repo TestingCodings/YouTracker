@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'auth/youtube_auth_service.dart';
+import 'auth/token_storage.dart';
 import 'local_storage_service.dart';
 
 /// Service for handling user authentication.
-/// This is a stub implementation for future backend integration.
+/// Supports both legacy authentication and YouTube OAuth.
 class AuthService {
   static AuthService? _instance;
   static AuthService get instance {
@@ -12,6 +14,17 @@ class AuthService {
   }
 
   AuthService._();
+
+  /// Factory constructor for testing/custom configuration.
+  factory AuthService.withYouTubeAuth({
+    required YouTubeAuthService youtubeAuthService,
+  }) {
+    return AuthService._withYouTube(youtubeAuthService);
+  }
+
+  AuthService._withYouTube(this._youtubeAuthService);
+
+  YouTubeAuthService? _youtubeAuthService;
 
   final StreamController<AuthState> _authStateController =
       StreamController<AuthState>.broadcast();
@@ -27,8 +40,36 @@ class AuthService {
   User? _currentUser;
   User? get currentUser => _currentUser;
 
+  /// Whether using YouTube authentication.
+  bool get isUsingYouTubeAuth => _youtubeAuthService != null;
+
+  /// Gets the YouTube auth service (initializing if needed).
+  YouTubeAuthService get youtubeAuthService {
+    _youtubeAuthService ??= YouTubeAuthService();
+    return _youtubeAuthService!;
+  }
+
   /// Initializes the auth service and checks for existing session.
   Future<void> initialize() async {
+    // Try YouTube auth first if available
+    if (_youtubeAuthService != null) {
+      await _youtubeAuthService!.initialize();
+      
+      if (_youtubeAuthService!.isAuthenticated) {
+        final ytUser = _youtubeAuthService!.currentUser;
+        if (ytUser != null) {
+          _currentUser = User(
+            email: ytUser.email,
+            name: ytUser.displayName,
+            photoUrl: ytUser.photoUrl,
+          );
+          _updateState(AuthState.authenticated);
+          return;
+        }
+      }
+    }
+
+    // Fall back to local storage check
     final localStorage = LocalStorageService.instance;
     final isLoggedIn =
         localStorage.getSettingWithDefault<bool>(SettingsKeys.isLoggedIn, false);
@@ -100,36 +141,45 @@ class AuthService {
     );
   }
 
-  /// Signs in with Google.
+  /// Signs in with Google/YouTube.
   Future<AuthResult> signInWithGoogle() async {
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
+    final result = await youtubeAuthService.signIn();
 
-    // TODO: Implement actual Google sign-in
-    // For now, simulate successful login
-    _currentUser = User(
-      email: 'user@gmail.com',
-      name: 'Google User',
-      photoUrl: 'https://ui-avatars.com/api/?name=Google+User',
-    );
+    if (result.success && result.user != null) {
+      _currentUser = User(
+        email: result.user!.email,
+        name: result.user!.displayName,
+        photoUrl: result.user!.photoUrl,
+      );
 
-    // Save to local storage
-    final localStorage = LocalStorageService.instance;
-    await localStorage.saveSetting(SettingsKeys.isLoggedIn, true);
-    await localStorage.saveSetting(SettingsKeys.userEmail, _currentUser!.email);
-    await localStorage.saveSetting(SettingsKeys.userName, _currentUser!.name);
+      // Save to local storage
+      final localStorage = LocalStorageService.instance;
+      await localStorage.saveSetting(SettingsKeys.isLoggedIn, true);
+      await localStorage.saveSetting(SettingsKeys.userEmail, _currentUser!.email);
+      await localStorage.saveSetting(SettingsKeys.userName, _currentUser!.name);
 
-    _updateState(AuthState.authenticated);
+      _updateState(AuthState.authenticated);
+
+      return AuthResult(
+        success: true,
+        message: 'Google sign-in successful',
+        user: _currentUser,
+      );
+    }
 
     return AuthResult(
-      success: true,
-      message: 'Google sign-in successful',
-      user: _currentUser,
+      success: false,
+      message: result.message ?? 'Google sign-in failed',
     );
   }
 
   /// Signs out the current user.
   Future<void> signOut() async {
+    // Sign out from YouTube if using it
+    if (_youtubeAuthService != null) {
+      await _youtubeAuthService!.signOut();
+    }
+
     // Clear local storage
     final localStorage = LocalStorageService.instance;
     await localStorage.saveSetting(SettingsKeys.isLoggedIn, false);
@@ -140,6 +190,26 @@ class AuthService {
     _updateState(AuthState.unauthenticated);
   }
 
+  /// Disconnects the Google account (revokes permissions).
+  Future<void> disconnect() async {
+    if (_youtubeAuthService != null) {
+      await _youtubeAuthService!.disconnect();
+    }
+    await signOut();
+  }
+
+  /// Gets a valid access token for YouTube API calls.
+  Future<String?> getAccessToken() async {
+    if (_youtubeAuthService == null) return null;
+    return await _youtubeAuthService!.getValidAccessToken();
+  }
+
+  /// Gets authentication headers for API calls.
+  Future<Map<String, String>?> getAuthHeaders() async {
+    if (_youtubeAuthService == null) return null;
+    return await _youtubeAuthService!.getAuthHeaders();
+  }
+
   /// Updates the auth state and notifies listeners.
   void _updateState(AuthState state) {
     _currentState = state;
@@ -148,6 +218,7 @@ class AuthService {
 
   /// Disposes of resources.
   void dispose() {
+    _youtubeAuthService?.dispose();
     _authStateController.close();
   }
 }
