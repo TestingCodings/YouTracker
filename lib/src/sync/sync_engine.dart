@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 
 import '../../models/models.dart';
@@ -269,7 +270,7 @@ class SyncEngine {
       );
     } catch (e) {
       // Migration failed - log but don't block
-      print('Migration warning: $e');
+      debugPrint('Migration warning: $e');
     }
   }
 

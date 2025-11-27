@@ -103,7 +103,7 @@ class _SyncStatusPageState extends ConsumerState<SyncStatusPage> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
+                color: statusColor.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: status.isSyncing
@@ -207,7 +207,7 @@ class _SyncStatusPageState extends ConsumerState<SyncStatusPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(

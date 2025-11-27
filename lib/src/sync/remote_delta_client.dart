@@ -13,18 +13,13 @@ class DeltaSyncResponse<T> {
   final bool wasModified;
   final DateTime syncTime;
 
-  const DeltaSyncResponse({
+  DeltaSyncResponse({
     required this.items,
     this.nextPageToken,
     this.etag,
     this.wasModified = true,
     DateTime? syncTime,
-  }) : syncTime = syncTime ?? const _CurrentDateTime();
-}
-
-class _CurrentDateTime implements DateTime {
-  const _CurrentDateTime();
-  @override dynamic noSuchMethod(Invocation invocation) => DateTime.now();
+  }) : syncTime = syncTime ?? DateTime.now();
 }
 
 /// Client for fetching remote deltas with ETag support.
