@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 import '../src/design_tokens.dart';
+import 'bookmark_button.dart';
 
 /// A card widget for displaying a comment in a list.
 /// Wrapped with Hero for smooth transitions to detail screen.
@@ -89,7 +90,7 @@ class CommentCard extends StatelessWidget {
                     ),
                   ),
                   // Animated bookmark button
-                  _AnimatedBookmarkButton(
+                  AnimatedBookmarkButton(
                     isBookmarked: comment.isBookmarked,
                     onPressed: onBookmarkTap,
                     primaryColor: theme.colorScheme.primary,
@@ -238,40 +239,6 @@ class CommentCard extends StatelessWidget {
     } else {
       return 'Just now';
     }
-  }
-}
-
-/// Animated bookmark button with scale and icon transition.
-class _AnimatedBookmarkButton extends StatelessWidget {
-  final bool isBookmarked;
-  final VoidCallback? onPressed;
-  final Color primaryColor;
-
-  const _AnimatedBookmarkButton({
-    required this.isBookmarked,
-    this.onPressed,
-    required this.primaryColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onPressed,
-      icon: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
-        transitionBuilder: (child, animation) {
-          return ScaleTransition(
-            scale: animation,
-            child: child,
-          );
-        },
-        child: Icon(
-          isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-          key: ValueKey(isBookmarked),
-          color: isBookmarked ? primaryColor : null,
-        ),
-      ),
-    );
   }
 }
 

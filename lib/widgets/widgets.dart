@@ -1,4 +1,5 @@
 export 'animated_button.dart';
+export 'bookmark_button.dart';
 export 'channel_dropdown.dart';
 export 'channel_selector_modal.dart';
 export 'charts/charts.dart';
