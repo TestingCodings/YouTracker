@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/providers.dart';
+import '../sentiment/sentiment.dart';
 import '../services/services.dart';
 import '../widgets/widgets.dart';
 
@@ -87,6 +88,38 @@ class SettingsScreen extends ConsumerWidget {
                   },
                 ),
               ),
+            ],
+          ),
+
+          // Sentiment Analysis section
+          SettingsSection(
+            title: 'Sentiment Analysis',
+            children: [
+              SettingsTile(
+                icon: Icons.psychology_outlined,
+                title: 'Enable Analysis',
+                subtitle: settings.sentimentConfig.enabled
+                    ? 'Analyzing comments'
+                    : 'Disabled',
+                trailing: Switch(
+                  value: settings.sentimentConfig.enabled,
+                  onChanged: (_) {
+                    ref.read(settingsProvider.notifier).setSentimentEnabled(
+                      !settings.sentimentConfig.enabled,
+                    );
+                  },
+                ),
+              ),
+              if (settings.sentimentConfig.enabled)
+                SettingsTile(
+                  icon: Icons.memory_outlined,
+                  title: 'Provider',
+                  subtitle: settings.sentimentConfig.provider.displayName,
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    _showSentimentProviderPicker(context, ref, settings);
+                  },
+                ),
             ],
           ),
 
@@ -422,5 +455,41 @@ class SettingsScreen extends ConsumerWidget {
     } else {
       return '${difference.inDays}d ago';
     }
+  }
+
+  void _showSentimentProviderPicker(
+    BuildContext context,
+    WidgetRef ref,
+    AppSettings settings,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sentiment Provider'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: SentimentProvider.values.map((provider) {
+            return RadioListTile<SentimentProvider>(
+              value: provider,
+              groupValue: settings.sentimentConfig.provider,
+              title: Text(provider.displayName),
+              subtitle: Text(provider.description),
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(settingsProvider.notifier).setSentimentProvider(value);
+                  Navigator.pop(context);
+                }
+              },
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
   }
 }
