@@ -19,8 +19,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch comments when screen loads
+    // Initialize channel provider and fetch comments when screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(channelProvider.notifier).initialize();
       ref.read(commentsProvider.notifier).fetchComments();
     });
   }
@@ -33,6 +34,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       appBar: AppBar(
         title: const Text('YouTracker'),
         actions: [
+          // Channel dropdown
+          const ChannelDropdownCompact(),
           // Sync status indicator
           SyncStatusIndicator(
             onTap: () => context.push('/sync-status'),

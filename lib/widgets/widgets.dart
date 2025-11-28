@@ -1,3 +1,5 @@
+export 'channel_dropdown.dart';
+export 'channel_selector_modal.dart';
 export 'charts/charts.dart';
 export 'comment_card.dart';
 export 'common_widgets.dart';
