@@ -50,3 +50,29 @@ coverage/
 
 # Generated files (keep lib/models/*.g.dart for Hive adapters)
 *.freezed.dart
+
+# Environment files with secrets - NEVER commit these
+.env
+.env.local
+.env.development
+.env.staging
+.env.production
+.env*.local
+
+# Keep the example file
+!.env.example
+
+# Debug symbols (should be archived separately, not in git)
+/debug-symbols/
+*.symbols.zip
+debug-symbols*.zip
+
+# Keystore files (Android signing)
+*.keystore
+*.jks
+key.properties
+
+# iOS certificates and provisioning
+*.mobileprovision
+*.p12
+*.cer
