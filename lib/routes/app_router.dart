@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,7 @@ import '../providers/providers.dart';
 import '../screens/screens.dart';
 import '../services/services.dart';
 import '../src/ui/pages/sync_status_page.dart';
+import '../ui_demo.dart';
 
 /// GoRouter configuration for the app.
 final routerProvider = Provider<GoRouter>((ref) {
@@ -156,6 +158,34 @@ final routerProvider = Provider<GoRouter>((ref) {
           },
         ),
       ),
+      // UI Demo route - available only in debug mode
+      if (kDebugMode)
+        GoRoute(
+          path: '/ui-demo',
+          name: 'uiDemo',
+          pageBuilder: (context, state) => CustomTransitionPage(
+            key: state.pageKey,
+            child: const UiDemoPage(),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              return FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeInOut,
+                ),
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeInOut,
+                    ),
+                  ),
+                  child: child,
+                ),
+              );
+            },
+          ),
+        ),
     ],
     errorPageBuilder: (context, state) => MaterialPage(
       key: state.pageKey,
@@ -201,4 +231,5 @@ class AppRoutes {
   static const String syncStatus = 'syncStatus';
   static const String analytics = 'analytics';
   static const String insights = 'insights';
+  static const String uiDemo = 'uiDemo';
 }

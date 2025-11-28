@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
+import '../src/design_tokens.dart';
 
 /// A card widget for displaying a comment in a list.
+/// Wrapped with Hero for smooth transitions to detail screen.
 class CommentCard extends StatelessWidget {
   final Comment comment;
   final VoidCallback? onTap;
   final VoidCallback? onBookmarkTap;
   final bool showSentimentBadge;
+  
+  /// Whether to enable Hero transitions for this card.
+  final bool enableHero;
 
   const CommentCard({
     super.key,
@@ -15,6 +20,7 @@ class CommentCard extends StatelessWidget {
     this.onTap,
     this.onBookmarkTap,
     this.showSentimentBadge = true,
+    this.enableHero = true,
   });
 
   @override
@@ -22,11 +28,11 @@ class CommentCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isToxic = comment.isToxic ?? false;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    Widget cardContent = Card(
+      margin: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.sm),
       shape: isToxic
           ? RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(Radii.lg),
               side: BorderSide(
                 color: theme.colorScheme.error,
                 width: 2,
@@ -35,9 +41,9 @@ class CommentCard extends StatelessWidget {
           : null,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Radii.lg),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(Spacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -50,14 +56,14 @@ class CommentCard extends StatelessWidget {
                     height: 45,
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(Radii.md),
                     ),
                     child: Icon(
                       Icons.play_circle_outline,
                       color: theme.colorScheme.primary,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: Spacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -82,22 +88,17 @@ class CommentCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(
-                      comment.isBookmarked
-                          ? Icons.bookmark
-                          : Icons.bookmark_border,
-                      color: comment.isBookmarked
-                          ? theme.colorScheme.primary
-                          : null,
-                    ),
+                  // Animated bookmark button
+                  _AnimatedBookmarkButton(
+                    isBookmarked: comment.isBookmarked,
                     onPressed: onBookmarkTap,
+                    primaryColor: theme.colorScheme.primary,
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: Spacing.md),
               const Divider(height: 1),
-              const SizedBox(height: 12),
+              const SizedBox(height: Spacing.md),
               // Sentiment badge row (if enabled and available)
               if (showSentimentBadge && comment.sentimentLabel != null) ...[
                 Row(
@@ -107,16 +108,16 @@ class CommentCard extends StatelessWidget {
                       score: comment.sentimentScore,
                     ),
                     if (isToxic) ...[
-                      const SizedBox(width: 8),
+                      const SizedBox(width: Spacing.sm),
                       _ToxicWarningBadge(score: comment.toxicScore),
                     ],
                     if (comment.needsReply == true) ...[
-                      const SizedBox(width: 8),
+                      const SizedBox(width: Spacing.sm),
                       _NeedsReplyBadge(),
                     ],
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: Spacing.sm),
               ],
               // Comment text
               Text(
@@ -125,7 +126,7 @@ class CommentCard extends StatelessWidget {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: Spacing.md),
               // Stats row
               Row(
                 children: [
@@ -134,7 +135,7 @@ class CommentCard extends StatelessWidget {
                     Icons.thumb_up_outlined,
                     comment.likeCount.toString(),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: Spacing.lg),
                   _buildStatItem(
                     context,
                     Icons.comment_outlined,
@@ -153,6 +154,51 @@ class CommentCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+
+    // Wrap with Hero for smooth transitions
+    if (enableHero) {
+      return Hero(
+        tag: 'comment-${comment.id}',
+        flightShuttleBuilder: _heroFlightShuttleBuilder,
+        child: Material(
+          type: MaterialType.transparency,
+          child: cardContent,
+        ),
+      );
+    }
+
+    return cardContent;
+  }
+
+  /// Custom flight shuttle builder for smooth hero transitions.
+  Widget _heroFlightShuttleBuilder(
+    BuildContext flightContext,
+    Animation<double> animation,
+    HeroFlightDirection flightDirection,
+    BuildContext fromHeroContext,
+    BuildContext toHeroContext,
+  ) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        // Animate border radius during transition
+        final borderRadius = BorderRadiusTween(
+          begin: BorderRadius.circular(Radii.lg),
+          end: BorderRadius.circular(Radii.lg),
+        ).evaluate(animation)!;
+
+        return ClipRRect(
+          borderRadius: borderRadius,
+          child: Material(
+            elevation: Tween<double>(begin: 2.0, end: 0.0).evaluate(animation),
+            borderRadius: borderRadius,
+            child: flightDirection == HeroFlightDirection.push
+                ? toHeroContext.widget
+                : fromHeroContext.widget,
+          ),
+        );
+      },
     );
   }
 
@@ -192,6 +238,40 @@ class CommentCard extends StatelessWidget {
     } else {
       return 'Just now';
     }
+  }
+}
+
+/// Animated bookmark button with scale and icon transition.
+class _AnimatedBookmarkButton extends StatelessWidget {
+  final bool isBookmarked;
+  final VoidCallback? onPressed;
+  final Color primaryColor;
+
+  const _AnimatedBookmarkButton({
+    required this.isBookmarked,
+    this.onPressed,
+    required this.primaryColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        transitionBuilder: (child, animation) {
+          return ScaleTransition(
+            scale: animation,
+            child: child,
+          );
+        },
+        child: Icon(
+          isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+          key: ValueKey(isBookmarked),
+          color: isBookmarked ? primaryColor : null,
+        ),
+      ),
+    );
   }
 }
 

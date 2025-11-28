@@ -1,3 +1,4 @@
+export 'animated_button.dart';
 export 'channel_dropdown.dart';
 export 'channel_selector_modal.dart';
 export 'charts/charts.dart';
@@ -5,5 +6,6 @@ export 'comment_card.dart';
 export 'common_widgets.dart';
 export 'interaction_tile.dart';
 export 'pagination_controls.dart';
+export 'search_bar.dart';
 export 'search_bar_widget.dart';
 export 'settings_tile.dart';
