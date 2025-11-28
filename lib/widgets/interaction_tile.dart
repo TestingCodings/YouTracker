@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
+import '../theme/motion_spec.dart';
 
-/// A tile widget for displaying an interaction notification.
-class InteractionTile extends StatelessWidget {
+/// A tile widget for displaying an interaction notification with animations.
+class InteractionTile extends StatefulWidget {
   final Interaction interaction;
   final VoidCallback? onTap;
 
@@ -14,24 +15,65 @@ class InteractionTile extends StatelessWidget {
   });
 
   @override
+  State<InteractionTile> createState() => _InteractionTileState();
+}
+
+class _InteractionTileState extends State<InteractionTile>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  bool _hasAnimated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: MotionSpec.durationMedium,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: MotionSpec.curveDecelerate,
+    );
+    
+    // Delay animation for staggered effect
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_hasAnimated) {
+        _hasAnimated = true;
+        _controller.forward();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final reduceMotion = MotionSpec.shouldReduceMotion(context);
 
-    return ListTile(
-      onTap: onTap,
+    Widget tile = ListTile(
+      onTap: widget.onTap,
       leading: _buildLeadingIcon(context),
       title: Text(
-        interaction.displayText,
+        widget.interaction.displayText,
         style: theme.textTheme.bodyMedium?.copyWith(
-          fontWeight: interaction.isRead ? FontWeight.normal : FontWeight.w600,
+          fontWeight: widget.interaction.isRead ? FontWeight.normal : FontWeight.w600,
         ),
       ),
-      subtitle: interaction.replyText != null
-          ? Text(
-              interaction.replyText!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall,
+      subtitle: widget.interaction.replyText != null
+          ? Padding(
+              padding: EdgeInsets.only(top: AppSpacing.xs),
+              child: Text(
+                widget.interaction.replyText!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall,
+              ),
             )
           : null,
       trailing: Column(
@@ -39,14 +81,15 @@ class InteractionTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            _formatDate(interaction.timestamp),
+            _formatDate(widget.interaction.timestamp),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.secondary.withValues(alpha: 0.7),
             ),
           ),
-          if (!interaction.isRead)
-            Container(
-              margin: const EdgeInsets.only(top: 4),
+          if (!widget.interaction.isRead)
+            AnimatedContainer(
+              duration: reduceMotion ? Duration.zero : MotionSpec.durationShort,
+              margin: EdgeInsets.only(top: AppSpacing.xs),
               width: 8,
               height: 8,
               decoration: BoxDecoration(
@@ -56,9 +99,24 @@ class InteractionTile extends StatelessWidget {
             ),
         ],
       ),
-      tileColor: interaction.isRead
+      tileColor: widget.interaction.isRead
           ? null
           : theme.colorScheme.primary.withValues(alpha: 0.05),
+    );
+
+    if (reduceMotion) {
+      return tile;
+    }
+
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0.02, 0),
+          end: Offset.zero,
+        ).animate(_fadeAnimation),
+        child: tile,
+      ),
     );
   }
 
@@ -67,7 +125,7 @@ class InteractionTile extends StatelessWidget {
     IconData icon;
     Color color;
 
-    switch (interaction.type) {
+    switch (widget.interaction.type) {
       case InteractionType.like:
         icon = Icons.thumb_up;
         color = Colors.blue;
@@ -87,8 +145,9 @@ class InteractionTile extends StatelessWidget {
     }
 
     return CircleAvatar(
+      radius: AppSpacing.avatarSizeSmall / 2,
       backgroundColor: color.withValues(alpha: 0.1),
-      child: Icon(icon, color: color, size: 20),
+      child: Icon(icon, color: color, size: AppSpacing.iconSizeMedium - 4),
     );
   }
 

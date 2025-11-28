@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
 import '../src/providers/sync_status_provider.dart';
 import '../src/ui/widgets/sync_status_indicator.dart';
+import '../theme/motion_spec.dart';
 import '../widgets/widgets.dart';
 
 /// Dashboard screen showing comments with search and pagination.
+/// Uses sliver-based scrolling for better performance and UX.
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
@@ -16,6 +18,8 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -27,139 +31,226 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final commentsState = ref.watch(commentsProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('YouTracker'),
-        actions: [
-          // Channel dropdown
-          const ChannelDropdownCompact(),
-          // Sync status indicator
-          SyncStatusIndicator(
-            onTap: () => context.push('/sync-status'),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          // Trigger sync and refresh comments
+          final syncNotifier = ref.read(syncStatusProvider.notifier);
+          await syncNotifier.syncNow();
+          await ref.read(commentsProvider.notifier).refresh();
+        },
+        edgeOffset: kToolbarHeight + MediaQuery.of(context).padding.top,
+        child: CustomScrollView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
           ),
-          IconButton(
-            icon: const Icon(Icons.analytics_outlined),
-            onPressed: () => context.push('/analytics'),
-            tooltip: 'Analytics Dashboard',
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () => _showNotificationsBottomSheet(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => context.push('/settings'),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Search bar
-          SearchBarWidget(
-            initialValue: commentsState.searchQuery,
-            onSearch: (query) {
-              ref.read(commentsProvider.notifier).search(query);
-            },
-            onClear: () {
-              ref.read(commentsProvider.notifier).clearSearch();
-            },
-          ),
-
-          // Stats row
-          _buildStatsRow(commentsState),
-
-          // Comments list
-          Expanded(
-            child: _buildCommentsList(commentsState),
-          ),
-
-          // Pagination controls
-          if (commentsState.totalPages > 1)
-            PaginationControls(
-              currentPage: commentsState.currentPage,
-              totalPages: commentsState.totalPages,
-              hasNextPage: commentsState.hasNextPage,
-              hasPreviousPage: commentsState.hasPreviousPage,
-              isLoading: commentsState.isLoading,
-              onNextPage: () {
-                ref.read(commentsProvider.notifier).nextPage();
-              },
-              onPreviousPage: () {
-                ref.read(commentsProvider.notifier).previousPage();
-              },
+          slivers: [
+            // Sliver app bar with stretch effect
+            SliverAppBar(
+              expandedHeight: 120,
+              floating: false,
+              pinned: true,
+              stretch: true,
+              backgroundColor: theme.colorScheme.surface,
+              surfaceTintColor: Colors.transparent,
+              flexibleSpace: FlexibleSpaceBar(
+                stretchModes: const [
+                  StretchMode.zoomBackground,
+                  StretchMode.fadeTitle,
+                ],
+                centerTitle: false,
+                titlePadding: const EdgeInsets.only(
+                  left: AppSpacing.df,
+                  bottom: AppSpacing.df,
+                ),
+                title: Text(
+                  'YouTracker',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        theme.colorScheme.primary.withValues(alpha: 0.08),
+                        theme.colorScheme.surface,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                // Channel dropdown
+                const ChannelDropdownCompact(),
+                // Sync status indicator
+                SyncStatusIndicator(
+                  onTap: () => context.push('/sync-status'),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.analytics_outlined),
+                  onPressed: () => context.push('/analytics'),
+                  tooltip: 'Analytics Dashboard',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.notifications_outlined),
+                  onPressed: () => _showNotificationsBottomSheet(context),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined),
+                  onPressed: () => context.push('/settings'),
+                ),
+              ],
             ),
-        ],
+
+            // Search bar
+            SliverToBoxAdapter(
+              child: SearchBarWidget(
+                initialValue: commentsState.searchQuery,
+                onSearch: (query) {
+                  ref.read(commentsProvider.notifier).search(query);
+                },
+                onClear: () {
+                  ref.read(commentsProvider.notifier).clearSearch();
+                },
+              ),
+            ),
+
+            // Stats row
+            SliverToBoxAdapter(
+              child: _buildStatsRow(commentsState),
+            ),
+
+            // Comments list
+            _buildCommentsSliverList(commentsState),
+
+            // Pagination controls
+            if (commentsState.totalPages > 1)
+              SliverToBoxAdapter(
+                child: PaginationControls(
+                  currentPage: commentsState.currentPage,
+                  totalPages: commentsState.totalPages,
+                  hasNextPage: commentsState.hasNextPage,
+                  hasPreviousPage: commentsState.hasPreviousPage,
+                  isLoading: commentsState.isLoading,
+                  onNextPage: () {
+                    ref.read(commentsProvider.notifier).nextPage();
+                    // Scroll to top after page change
+                    _scrollController.animateTo(
+                      0,
+                      duration: MotionSpec.durationMedium,
+                      curve: MotionSpec.curveStandard,
+                    );
+                  },
+                  onPreviousPage: () {
+                    ref.read(commentsProvider.notifier).previousPage();
+                    _scrollController.animateTo(
+                      0,
+                      duration: MotionSpec.durationMedium,
+                      curve: MotionSpec.curveStandard,
+                    );
+                  },
+                ),
+              ),
+
+            // Bottom padding
+            const SliverToBoxAdapter(
+              child: SizedBox(height: AppSpacing.xl),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildStatsRow(CommentsState state) {
     final theme = Theme.of(context);
+    final reduceMotion = MotionSpec.shouldReduceMotion(context);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return AnimatedContainer(
+      duration: reduceMotion ? Duration.zero : MotionSpec.durationShort,
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.df,
+        vertical: AppSpacing.sm,
+      ),
       child: Row(
         children: [
-          Text(
-            '${state.totalItems} comments',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.secondary,
+          AnimatedSwitcher(
+            duration: reduceMotion ? Duration.zero : MotionSpec.durationShort,
+            child: Text(
+              '${state.totalItems} comments',
+              key: ValueKey(state.totalItems),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.secondary,
+              ),
             ),
           ),
           const Spacer(),
           if (state.searchQuery.isNotEmpty)
-            Chip(
-              label: Text('Search: ${state.searchQuery}'),
-              deleteIcon: const Icon(Icons.close, size: 16),
-              onDeleted: () {
-                ref.read(commentsProvider.notifier).clearSearch();
-              },
+            AnimatedOpacity(
+              opacity: state.searchQuery.isNotEmpty ? 1.0 : 0.0,
+              duration: reduceMotion ? Duration.zero : MotionSpec.durationShort,
+              child: Chip(
+                label: Text('Search: ${state.searchQuery}'),
+                deleteIcon: const Icon(Icons.close, size: 16),
+                onDeleted: () {
+                  ref.read(commentsProvider.notifier).clearSearch();
+                },
+              ),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildCommentsList(CommentsState state) {
+  Widget _buildCommentsSliverList(CommentsState state) {
     if (state.isLoading && state.comments.isEmpty) {
-      return const LoadingIndicator(message: 'Loading comments...');
+      return const SliverFillRemaining(
+        child: LoadingIndicator(message: 'Loading comments...'),
+      );
     }
 
     if (state.error != null && state.comments.isEmpty) {
-      return ErrorMessage(
-        message: state.error!,
-        onRetry: () {
-          ref.read(commentsProvider.notifier).refresh();
-        },
+      return SliverFillRemaining(
+        child: ErrorMessage(
+          message: state.error!,
+          onRetry: () {
+            ref.read(commentsProvider.notifier).refresh();
+          },
+        ),
       );
     }
 
     if (state.comments.isEmpty) {
-      return EmptyState(
-        icon: Icons.comment_outlined,
-        title: state.searchQuery.isNotEmpty
-            ? 'No comments found'
-            : 'No comments yet',
-        subtitle: state.searchQuery.isNotEmpty
-            ? 'Try a different search term'
-            : 'Your comments will appear here',
+      return SliverFillRemaining(
+        child: EmptyState(
+          icon: Icons.comment_outlined,
+          title: state.searchQuery.isNotEmpty
+              ? 'No comments found'
+              : 'No comments yet',
+          subtitle: state.searchQuery.isNotEmpty
+              ? 'Try a different search term'
+              : 'Your comments will appear here',
+        ),
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        // Trigger sync and refresh comments
-        final syncNotifier = ref.read(syncStatusProvider.notifier);
-        await syncNotifier.syncNow();
-        await ref.read(commentsProvider.notifier).refresh();
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.only(top: 8, bottom: 16),
-        itemCount: state.comments.length,
-        itemBuilder: (context, index) {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
           final comment = state.comments[index];
           return CommentCard(
             comment: comment,
@@ -171,6 +262,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             },
           );
         },
+        childCount: state.comments.length,
       ),
     );
   }
@@ -180,7 +272,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.lg)),
       ),
       builder: (context) => const _NotificationsBottomSheet(),
     );
@@ -220,7 +312,7 @@ class _NotificationsBottomSheetState
           children: [
             // Handle
             Container(
-              margin: const EdgeInsets.only(top: 8),
+              margin: EdgeInsets.only(top: AppSpacing.sm),
               width: 40,
               height: 4,
               decoration: BoxDecoration(
@@ -230,14 +322,14 @@ class _NotificationsBottomSheetState
             ),
             // Header
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: AppSpacing.paddingDf,
               child: Row(
                 children: [
                   Text(
                     'Notifications',
                     style: theme.textTheme.titleLarge,
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: AppSpacing.sm),
                   if (interactionsState.unreadCount > 0)
                     Badge(
                       label: Text('${interactionsState.unreadCount}'),

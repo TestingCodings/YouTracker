@@ -6,6 +6,8 @@ import '../providers/providers.dart';
 import '../screens/screens.dart';
 import '../services/services.dart';
 import '../src/ui/pages/sync_status_page.dart';
+import '../theme/motion_spec.dart';
+import '../ui_demo.dart';
 
 /// GoRouter configuration for the app.
 final routerProvider = Provider<GoRouter>((ref) {
@@ -16,6 +18,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       final authState = ref.read(authStateProvider);
       final isLoggedIn = authState.state == AuthState.authenticated;
       final isLoginRoute = state.matchedLocation == '/login';
+      final isUIDemoRoute = state.matchedLocation == '/ui-demo';
+
+      // Allow access to UI demo without authentication
+      if (isUIDemoRoute) {
+        return null;
+      }
 
       // Redirect to dashboard if logged in and on login page
       if (isLoggedIn && isLoginRoute) {
@@ -57,20 +65,37 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'commentDetail',
         pageBuilder: (context, state) {
           final commentId = state.pathParameters['id'] ?? '';
+          final reduceMotion = MotionSpec.shouldReduceMotion(context);
+          
           return CustomTransitionPage(
             key: state.pageKey,
             child: CommentDetailScreen(commentId: commentId),
+            transitionDuration: reduceMotion 
+                ? Duration.zero 
+                : MotionSpec.durationLong,
+            reverseTransitionDuration: reduceMotion 
+                ? Duration.zero 
+                : MotionSpec.durationMedium,
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
-              return SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(1.0, 0.0),
-                  end: Offset.zero,
-                ).animate(CurvedAnimation(
+              if (reduceMotion) {
+                return child;
+              }
+              return FadeTransition(
+                opacity: CurvedAnimation(
                   parent: animation,
-                  curve: Curves.easeInOut,
-                )),
-                child: child,
+                  curve: MotionSpec.curveStandard,
+                ),
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.05, 0.0),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                    parent: animation,
+                    curve: MotionSpec.curveStandard,
+                  )),
+                  child: child,
+                ),
               );
             },
           );
@@ -79,82 +104,158 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         name: 'settings',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const SettingsScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(1.0, 0.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeInOut,
-              )),
-              child: child,
-            );
-          },
-        ),
+        pageBuilder: (context, state) {
+          final reduceMotion = MotionSpec.shouldReduceMotion(context);
+          
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: const SettingsScreen(),
+            transitionDuration: reduceMotion 
+                ? Duration.zero 
+                : MotionSpec.durationMedium,
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              if (reduceMotion) {
+                return child;
+              }
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1.0, 0.0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: MotionSpec.curveStandard,
+                )),
+                child: child,
+              );
+            },
+          );
+        },
       ),
       GoRoute(
         path: '/sync-status',
         name: 'syncStatus',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const SyncStatusPage(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(1.0, 0.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeInOut,
-              )),
-              child: child,
-            );
-          },
-        ),
+        pageBuilder: (context, state) {
+          final reduceMotion = MotionSpec.shouldReduceMotion(context);
+          
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: const SyncStatusPage(),
+            transitionDuration: reduceMotion 
+                ? Duration.zero 
+                : MotionSpec.durationMedium,
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              if (reduceMotion) {
+                return child;
+              }
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1.0, 0.0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: MotionSpec.curveStandard,
+                )),
+                child: child,
+              );
+            },
+          );
+        },
       ),
       GoRoute(
         path: '/analytics',
         name: 'analytics',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const AnalyticsDashboardScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(1.0, 0.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeInOut,
-              )),
-              child: child,
-            );
-          },
-        ),
+        pageBuilder: (context, state) {
+          final reduceMotion = MotionSpec.shouldReduceMotion(context);
+          
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: const AnalyticsDashboardScreen(),
+            transitionDuration: reduceMotion 
+                ? Duration.zero 
+                : MotionSpec.durationMedium,
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              if (reduceMotion) {
+                return child;
+              }
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1.0, 0.0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: MotionSpec.curveStandard,
+                )),
+                child: child,
+              );
+            },
+          );
+        },
       ),
       GoRoute(
         path: '/insights',
         name: 'insights',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const InsightsScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(1.0, 0.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeInOut,
-              )),
-              child: child,
-            );
-          },
-        ),
+        pageBuilder: (context, state) {
+          final reduceMotion = MotionSpec.shouldReduceMotion(context);
+          
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: const InsightsScreen(),
+            transitionDuration: reduceMotion 
+                ? Duration.zero 
+                : MotionSpec.durationMedium,
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              if (reduceMotion) {
+                return child;
+              }
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1.0, 0.0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: MotionSpec.curveStandard,
+                )),
+                child: child,
+              );
+            },
+          );
+        },
+      ),
+      // UI Demo page - accessible at /ui-demo
+      GoRoute(
+        path: '/ui-demo',
+        name: 'uiDemo',
+        pageBuilder: (context, state) {
+          final reduceMotion = MotionSpec.shouldReduceMotion(context);
+          
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: const UIDemoPage(),
+            transitionDuration: reduceMotion 
+                ? Duration.zero 
+                : MotionSpec.durationMedium,
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              if (reduceMotion) {
+                return child;
+              }
+              return FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: MotionSpec.curveStandard,
+                ),
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: MotionSpec.curveStandard,
+                    ),
+                  ),
+                  child: child,
+                ),
+              );
+            },
+          );
+        },
       ),
     ],
     errorPageBuilder: (context, state) => MaterialPage(
@@ -169,17 +270,17 @@ final routerProvider = Provider<GoRouter>((ref) {
                 size: 64,
                 color: Colors.red,
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppSpacing.df),
               Text(
                 'Page not found',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: AppSpacing.sm),
               Text(
                 state.matchedLocation,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: AppSpacing.lg),
               ElevatedButton(
                 onPressed: () => context.go('/dashboard'),
                 child: const Text('Go to Dashboard'),
@@ -201,4 +302,5 @@ class AppRoutes {
   static const String syncStatus = 'syncStatus';
   static const String analytics = 'analytics';
   static const String insights = 'insights';
+  static const String uiDemo = 'uiDemo';
 }

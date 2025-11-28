@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// A loading indicator widget.
+import '../theme/motion_spec.dart';
+
+/// A loading indicator widget with animation support.
 class LoadingIndicator extends StatelessWidget {
   final String? message;
   final double size;
@@ -28,7 +30,7 @@ class LoadingIndicator extends StatelessWidget {
             ),
           ),
           if (message != null) ...[
-            const SizedBox(height: 16),
+            SizedBox(height: AppSpacing.df),
             Text(
               message!,
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -42,7 +44,7 @@ class LoadingIndicator extends StatelessWidget {
   }
 }
 
-/// An error message widget with retry option.
+/// An error message widget with retry option and animation.
 class ErrorMessage extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
@@ -59,7 +61,7 @@ class ErrorMessage extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: AppSpacing.paddingLg,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -68,14 +70,14 @@ class ErrorMessage extends StatelessWidget {
               size: 48,
               color: theme.colorScheme.error,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: AppSpacing.df),
             Text(
               message,
               style: theme.textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
             if (onRetry != null) ...[
-              const SizedBox(height: 16),
+              SizedBox(height: AppSpacing.df),
               ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
@@ -89,7 +91,7 @@ class ErrorMessage extends StatelessWidget {
   }
 }
 
-/// An empty state widget.
+/// An empty state widget with animation support.
 class EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -110,7 +112,7 @@ class EmptyState extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: AppSpacing.paddingLg,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -119,14 +121,14 @@ class EmptyState extends StatelessWidget {
               size: 64,
               color: theme.colorScheme.secondary.withValues(alpha: 0.5),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: AppSpacing.df),
             Text(
               title,
               style: theme.textTheme.titleMedium,
               textAlign: TextAlign.center,
             ),
             if (subtitle != null) ...[
-              const SizedBox(height: 8),
+              SizedBox(height: AppSpacing.sm),
               Text(
                 subtitle!,
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -136,7 +138,7 @@ class EmptyState extends StatelessWidget {
               ),
             ],
             if (action != null) ...[
-              const SizedBox(height: 24),
+              SizedBox(height: AppSpacing.lg),
               action!,
             ],
           ],
