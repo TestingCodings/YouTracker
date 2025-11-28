@@ -209,10 +209,17 @@ class _SentimentBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final (color, icon) = _getLabelStyle(label, theme);
+    
+    // Format score for display: show as percentage for positive, absolute for negative
+    String scoreText = '';
+    if (score != null) {
+      final absScore = score!.abs();
+      scoreText = ' (${(absScore * 100).toStringAsFixed(0)}%)';
+    }
 
     return Tooltip(
       message: score != null 
-          ? 'Sentiment: ${label.capitalize()} (${(score! * 100).toStringAsFixed(0)}%)'
+          ? 'Sentiment: ${label.capitalize()}$scoreText'
           : 'Sentiment: ${label.capitalize()}',
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

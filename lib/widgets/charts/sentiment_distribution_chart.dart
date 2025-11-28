@@ -93,11 +93,6 @@ class SentimentDistributionChart extends StatelessWidget {
               sections: sections,
               centerSpaceRadius: 40,
               sectionsSpace: 2,
-              pieTouchData: PieTouchData(
-                touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                  // Handle touch if needed
-                },
-              ),
             ),
           ),
         ),

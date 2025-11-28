@@ -64,7 +64,7 @@ void main() {
     test('should not flag non-toxic content', () async {
       final result = await service.analyze('Thanks for sharing this helpful tutorial.');
 
-      expect(result.toxicScore, lessThan(0.7));
+      expect(result.toxicScore, lessThan(service.config.toxicityThreshold));
       expect(result.isToxic, isFalse);
     });
 

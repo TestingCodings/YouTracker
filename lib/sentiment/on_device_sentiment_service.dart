@@ -2,6 +2,11 @@ import 'sentiment_config.dart';
 import 'sentiment_result.dart';
 import 'sentiment_service.dart';
 
+// Static regex patterns for performance optimization
+final _whitespacePattern = RegExp(r'\s+');
+final _capsPattern = RegExp(r'[A-Z]');
+final _excessivePunctuationPattern = RegExp(r'[!?]{3,}');
+
 /// On-device sentiment analysis service using heuristic-based analysis.
 ///
 /// This service provides lightweight, privacy-preserving sentiment analysis
@@ -232,9 +237,9 @@ class OnDeviceSentimentService implements SentimentService {
     };
 
     // All caps detection (shouting)
-    final words = text.split(RegExp(r'\s+'));
+    final words = text.split(_whitespacePattern);
     final capsWords = words.where((w) => 
-      w.length > 2 && w == w.toUpperCase() && w.contains(RegExp(r'[A-Z]'))
+      w.length > 2 && w == w.toUpperCase() && _capsPattern.hasMatch(w)
     ).length;
     if (capsWords > 2 || (words.length > 3 && capsWords / words.length > 0.5)) {
       score += 0.2;
@@ -248,8 +253,7 @@ class OnDeviceSentimentService implements SentimentService {
     }
 
     // Excessive punctuation (!!!, ???)
-    final excessivePunctuation = RegExp(r'[!?]{3,}');
-    if (excessivePunctuation.hasMatch(text)) {
+    if (_excessivePunctuationPattern.hasMatch(text)) {
       score += 0.1;
     }
 

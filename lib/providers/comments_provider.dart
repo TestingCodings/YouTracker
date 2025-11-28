@@ -70,17 +70,18 @@ class CommentsState {
       return comments;
     }
     return comments.where((comment) {
+      final label = comment.sentimentLabel?.toLowerCase();
       switch (sentimentFilter) {
         case CommentSentimentFilter.all:
           return true;
         case CommentSentimentFilter.positive:
-          return comment.sentimentLabel?.toLowerCase() == 'positive';
+          return label == 'positive';
         case CommentSentimentFilter.negative:
-          return comment.sentimentLabel?.toLowerCase() == 'negative';
+          return label == 'negative';
         case CommentSentimentFilter.neutral:
-          return comment.sentimentLabel?.toLowerCase() == 'neutral';
+          return label == 'neutral';
         case CommentSentimentFilter.questions:
-          return comment.sentimentLabel?.toLowerCase() == 'question';
+          return label == 'question';
         case CommentSentimentFilter.needsReply:
           return comment.needsReply == true;
         case CommentSentimentFilter.toxic:

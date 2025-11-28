@@ -237,7 +237,7 @@ class CloudSentimentService implements SentimentService {
     if (_requestTimestamps.length >= config.rateLimitPerMinute) {
       final oldestInWindow = _requestTimestamps.first;
       final waitTime = oldestInWindow.add(const Duration(minutes: 1)).difference(now);
-      if (waitTime.isNegative == false) {
+      if (!waitTime.isNegative) {
         await Future.delayed(waitTime + const Duration(milliseconds: 100));
       }
     }
