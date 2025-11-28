@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
 import '../sentiment/sentiment.dart';
 import '../services/services.dart';
+import '../theme/motion_spec.dart';
 import '../widgets/widgets.dart';
 
 /// Settings screen for app configuration.
@@ -19,241 +20,292 @@ class SettingsScreen extends ConsumerWidget {
     final authState = ref.watch(authStateProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+      body: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
         ),
-      ),
-      body: ListView(
-        children: [
-          // Account section
-          SettingsSection(
-            title: 'Account',
-            children: [
-              ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  child: Text(
-                    authState.user?.name[0].toUpperCase() ?? 'U',
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
+        slivers: [
+          // Sliver app bar
+          SliverAppBar(
+            expandedHeight: 100,
+            floating: false,
+            pinned: true,
+            stretch: true,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.pop(),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              stretchModes: const [
+                StretchMode.zoomBackground,
+                StretchMode.fadeTitle,
+              ],
+              centerTitle: false,
+              titlePadding: EdgeInsets.only(
+                left: AppSpacing.df + 48,
+                bottom: AppSpacing.df,
+              ),
+              title: Text(
+                'Settings',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      theme.colorScheme.primary.withValues(alpha: 0.06),
+                      theme.colorScheme.surface,
+                    ],
                   ),
                 ),
-                title: Text(authState.user?.name ?? 'User'),
-                subtitle: Text(authState.user?.email ?? ''),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  _showAccountBottomSheet(context, ref);
-                },
-              ),
-            ],
-          ),
-
-          // Appearance section
-          SettingsSection(
-            title: 'Appearance',
-            children: [
-              SettingsTile(
-                icon: Icons.dark_mode_outlined,
-                title: 'Dark Mode',
-                subtitle: themeMode == ThemeMode.dark ? 'On' : 'Off',
-                trailing: Switch(
-                  value: themeMode == ThemeMode.dark,
-                  onChanged: (_) {
-                    ref.read(themeModeProvider.notifier).toggleTheme();
-                  },
-                ),
-              ),
-            ],
-          ),
-
-          // Notifications section
-          SettingsSection(
-            title: 'Notifications',
-            children: [
-              SettingsTile(
-                icon: Icons.notifications_outlined,
-                title: 'Push Notifications',
-                subtitle: settings.notificationsEnabled
-                    ? 'Enabled'
-                    : 'Disabled',
-                trailing: Switch(
-                  value: settings.notificationsEnabled,
-                  onChanged: (_) {
-                    ref.read(settingsProvider.notifier).toggleNotifications();
-                  },
-                ),
-              ),
-            ],
-          ),
-
-          // Sentiment Analysis section
-          SettingsSection(
-            title: 'Sentiment Analysis',
-            children: [
-              SettingsTile(
-                icon: Icons.psychology_outlined,
-                title: 'Enable Analysis',
-                subtitle: settings.sentimentConfig.enabled
-                    ? 'Analyzing comments'
-                    : 'Disabled',
-                trailing: Switch(
-                  value: settings.sentimentConfig.enabled,
-                  onChanged: (_) {
-                    ref.read(settingsProvider.notifier).setSentimentEnabled(
-                      !settings.sentimentConfig.enabled,
-                    );
-                  },
-                ),
-              ),
-              if (settings.sentimentConfig.enabled)
-                SettingsTile(
-                  icon: Icons.memory_outlined,
-                  title: 'Provider',
-                  subtitle: settings.sentimentConfig.provider.displayName,
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    _showSentimentProviderPicker(context, ref, settings);
-                  },
-                ),
-            ],
-          ),
-
-          // Sync section
-          SettingsSection(
-            title: 'Data Sync',
-            children: [
-              SettingsTile(
-                icon: Icons.sync_outlined,
-                title: 'Background Sync',
-                subtitle: settings.syncEnabled ? 'Enabled' : 'Disabled',
-                trailing: Switch(
-                  value: settings.syncEnabled,
-                  onChanged: (_) {
-                    ref.read(settingsProvider.notifier).toggleSync();
-                  },
-                ),
-              ),
-              if (settings.syncEnabled)
-                SettingsTile(
-                  icon: Icons.timer_outlined,
-                  title: 'Sync Interval',
-                  subtitle: '${settings.syncIntervalMinutes} minutes',
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    _showSyncIntervalPicker(context, ref, settings);
-                  },
-                ),
-              SettingsTile(
-                icon: Icons.refresh,
-                title: 'Sync Now',
-                subtitle: settings.lastSyncTime != null
-                    ? 'Last sync: ${_formatSyncTime(settings.lastSyncTime!)}'
-                    : 'Never synced',
-                onTap: () async {
-                  final result =
-                      await ref.read(settingsProvider.notifier).syncNow();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(result.message)),
-                    );
-                  }
-                },
-              ),
-              SettingsTile(
-                icon: Icons.cloud_sync_outlined,
-                title: 'Sync Status',
-                subtitle: 'View sync queue and details',
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  context.push('/sync-status');
-                },
-              ),
-            ],
-          ),
-
-          // Storage section
-          SettingsSection(
-            title: 'Storage',
-            children: [
-              SettingsTile(
-                icon: Icons.storage_outlined,
-                title: 'Clear Cache',
-                subtitle: 'Free up storage space',
-                onTap: () {
-                  _showClearCacheDialog(context);
-                },
-              ),
-              SettingsTile(
-                icon: Icons.delete_outline,
-                title: 'Clear All Data',
-                subtitle: 'Delete all local data',
-                onTap: () {
-                  _showClearDataDialog(context, ref);
-                },
-              ),
-            ],
-          ),
-
-          // About section
-          SettingsSection(
-            title: 'About',
-            children: [
-              SettingsTile(
-                icon: Icons.info_outlined,
-                title: 'App Version',
-                subtitle: '1.0.0',
-              ),
-              SettingsTile(
-                icon: Icons.description_outlined,
-                title: 'Terms of Service',
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Terms of Service - Coming soon'),
-                    ),
-                  );
-                },
-              ),
-              SettingsTile(
-                icon: Icons.privacy_tip_outlined,
-                title: 'Privacy Policy',
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Privacy Policy - Coming soon'),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // Sign out button
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: OutlinedButton.icon(
-              onPressed: () {
-                _showSignOutDialog(context, ref);
-              },
-              icon: const Icon(Icons.logout),
-              label: const Text('Sign Out'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: theme.colorScheme.error,
-                side: BorderSide(color: theme.colorScheme.error),
               ),
             ),
           ),
 
-          const SizedBox(height: 32),
+          // Settings content
+          SliverList(
+            delegate: SliverChildListDelegate([
+              // Account section
+              SettingsSection(
+                title: 'Account',
+                children: [
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                      child: Text(
+                        authState.user?.name[0].toUpperCase() ?? 'U',
+                        style: TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: Text(authState.user?.name ?? 'User'),
+                    subtitle: Text(authState.user?.email ?? ''),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      _showAccountBottomSheet(context, ref);
+                    },
+                  ),
+                ],
+              ),
+
+              // Appearance section
+              SettingsSection(
+                title: 'Appearance',
+                children: [
+                  SettingsTile(
+                    icon: Icons.dark_mode_outlined,
+                    title: 'Dark Mode',
+                    subtitle: themeMode == ThemeMode.dark ? 'On' : 'Off',
+                    trailing: Switch(
+                      value: themeMode == ThemeMode.dark,
+                      onChanged: (_) {
+                        ref.read(themeModeProvider.notifier).toggleTheme();
+                      },
+                    ),
+                  ),
+                  SettingsTile(
+                    icon: Icons.palette_outlined,
+                    title: 'UI Demo',
+                    subtitle: 'Preview new UI components',
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      context.push('/ui-demo');
+                    },
+                  ),
+                ],
+              ),
+
+              // Notifications section
+              SettingsSection(
+                title: 'Notifications',
+                children: [
+                  SettingsTile(
+                    icon: Icons.notifications_outlined,
+                    title: 'Push Notifications',
+                    subtitle: settings.notificationsEnabled
+                        ? 'Enabled'
+                        : 'Disabled',
+                    trailing: Switch(
+                      value: settings.notificationsEnabled,
+                      onChanged: (_) {
+                        ref.read(settingsProvider.notifier).toggleNotifications();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              // Sentiment Analysis section
+              SettingsSection(
+                title: 'Sentiment Analysis',
+                children: [
+                  SettingsTile(
+                    icon: Icons.psychology_outlined,
+                    title: 'Enable Analysis',
+                    subtitle: settings.sentimentConfig.enabled
+                        ? 'Analyzing comments'
+                        : 'Disabled',
+                    trailing: Switch(
+                      value: settings.sentimentConfig.enabled,
+                      onChanged: (_) {
+                        ref.read(settingsProvider.notifier).setSentimentEnabled(
+                          !settings.sentimentConfig.enabled,
+                        );
+                      },
+                    ),
+                  ),
+                  if (settings.sentimentConfig.enabled)
+                    SettingsTile(
+                      icon: Icons.memory_outlined,
+                      title: 'Provider',
+                      subtitle: settings.sentimentConfig.provider.displayName,
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        _showSentimentProviderPicker(context, ref, settings);
+                      },
+                    ),
+                ],
+              ),
+
+              // Sync section
+              SettingsSection(
+                title: 'Data Sync',
+                children: [
+                  SettingsTile(
+                    icon: Icons.sync_outlined,
+                    title: 'Background Sync',
+                    subtitle: settings.syncEnabled ? 'Enabled' : 'Disabled',
+                    trailing: Switch(
+                      value: settings.syncEnabled,
+                      onChanged: (_) {
+                        ref.read(settingsProvider.notifier).toggleSync();
+                      },
+                    ),
+                  ),
+                  if (settings.syncEnabled)
+                    SettingsTile(
+                      icon: Icons.timer_outlined,
+                      title: 'Sync Interval',
+                      subtitle: '${settings.syncIntervalMinutes} minutes',
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        _showSyncIntervalPicker(context, ref, settings);
+                      },
+                    ),
+                  SettingsTile(
+                    icon: Icons.refresh,
+                    title: 'Sync Now',
+                    subtitle: settings.lastSyncTime != null
+                        ? 'Last sync: ${_formatSyncTime(settings.lastSyncTime!)}'
+                        : 'Never synced',
+                    onTap: () async {
+                      final result =
+                          await ref.read(settingsProvider.notifier).syncNow();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(result.message)),
+                        );
+                      }
+                    },
+                  ),
+                  SettingsTile(
+                    icon: Icons.cloud_sync_outlined,
+                    title: 'Sync Status',
+                    subtitle: 'View sync queue and details',
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      context.push('/sync-status');
+                    },
+                  ),
+                ],
+              ),
+
+              // Storage section
+              SettingsSection(
+                title: 'Storage',
+                children: [
+                  SettingsTile(
+                    icon: Icons.storage_outlined,
+                    title: 'Clear Cache',
+                    subtitle: 'Free up storage space',
+                    onTap: () {
+                      _showClearCacheDialog(context);
+                    },
+                  ),
+                  SettingsTile(
+                    icon: Icons.delete_outline,
+                    title: 'Clear All Data',
+                    subtitle: 'Delete all local data',
+                    onTap: () {
+                      _showClearDataDialog(context, ref);
+                    },
+                  ),
+                ],
+              ),
+
+              // About section
+              SettingsSection(
+                title: 'About',
+                children: [
+                  SettingsTile(
+                    icon: Icons.info_outlined,
+                    title: 'App Version',
+                    subtitle: '1.0.0',
+                  ),
+                  SettingsTile(
+                    icon: Icons.description_outlined,
+                    title: 'Terms of Service',
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Terms of Service - Coming soon'),
+                        ),
+                      );
+                    },
+                  ),
+                  SettingsTile(
+                    icon: Icons.privacy_tip_outlined,
+                    title: 'Privacy Policy',
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Privacy Policy - Coming soon'),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+
+              SizedBox(height: AppSpacing.lg),
+
+              // Sign out button
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.df),
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    _showSignOutDialog(context, ref);
+                  },
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Sign Out'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.error,
+                    side: BorderSide(color: theme.colorScheme.error),
+                  ),
+                ),
+              ),
+
+              SizedBox(height: AppSpacing.xl),
+            ]),
+          ),
         ],
       ),
     );

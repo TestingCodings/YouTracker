@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
+import '../theme/motion_spec.dart';
 
-/// A card widget for displaying a comment in a list.
+/// A card widget for displaying a comment in a list with Hero animation support.
 class CommentCard extends StatelessWidget {
   final Comment comment;
   final VoidCallback? onTap;
   final VoidCallback? onBookmarkTap;
   final bool showSentimentBadge;
+  final bool enableHeroAnimation;
 
   const CommentCard({
     super.key,
@@ -15,33 +17,168 @@ class CommentCard extends StatelessWidget {
     this.onTap,
     this.onBookmarkTap,
     this.showSentimentBadge = true,
+    this.enableHeroAnimation = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isToxic = comment.isToxic ?? false;
+    final reduceMotion = MotionSpec.shouldReduceMotion(context);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: isToxic
+    Widget cardContent = _CommentCardContent(
+      comment: comment,
+      onTap: onTap,
+      onBookmarkTap: onBookmarkTap,
+      showSentimentBadge: showSentimentBadge,
+      isToxic: isToxic,
+      theme: theme,
+    );
+
+    // Wrap with Hero for smooth transitions
+    if (enableHeroAnimation && !reduceMotion) {
+      cardContent = Hero(
+        tag: 'comment-${comment.id}',
+        flightShuttleBuilder: (
+          BuildContext flightContext,
+          Animation<double> animation,
+          HeroFlightDirection flightDirection,
+          BuildContext fromHeroContext,
+          BuildContext toHeroContext,
+        ) {
+          return AnimatedBuilder(
+            animation: animation,
+            builder: (context, child) {
+              return Material(
+                color: Colors.transparent,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: theme.cardColor,
+                    borderRadius: BorderRadius.circular(
+                      AppSpacing.cardBorderRadius,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.shadowColor.withValues(
+                          alpha: 0.1 * animation.value,
+                        ),
+                        blurRadius: 8 * animation.value,
+                        offset: Offset(0, 4 * animation.value),
+                      ),
+                    ],
+                  ),
+                  child: toHeroContext.widget,
+                ),
+              );
+            },
+          );
+        },
+        child: cardContent,
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.df,
+        vertical: AppSpacing.sm,
+      ),
+      child: cardContent,
+    );
+  }
+}
+
+class _CommentCardContent extends StatefulWidget {
+  final Comment comment;
+  final VoidCallback? onTap;
+  final VoidCallback? onBookmarkTap;
+  final bool showSentimentBadge;
+  final bool isToxic;
+  final ThemeData theme;
+
+  const _CommentCardContent({
+    required this.comment,
+    this.onTap,
+    this.onBookmarkTap,
+    required this.showSentimentBadge,
+    required this.isToxic,
+    required this.theme,
+  });
+
+  @override
+  State<_CommentCardContent> createState() => _CommentCardContentState();
+}
+
+class _CommentCardContentState extends State<_CommentCardContent>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pressController;
+  late Animation<double> _scaleAnimation;
+  bool _isPressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressController = AnimationController(
+      vsync: this,
+      duration: MotionSpec.durationShort,
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.98,
+    ).animate(CurvedAnimation(
+      parent: _pressController,
+      curve: MotionSpec.curveStandard,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _pressController.dispose();
+    super.dispose();
+  }
+
+  void _handleTapDown(TapDownDetails details) {
+    if (widget.onTap == null) return;
+    setState(() => _isPressed = true);
+    _pressController.forward();
+  }
+
+  void _handleTapUp(TapUpDetails details) {
+    setState(() => _isPressed = false);
+    _pressController.reverse();
+  }
+
+  void _handleTapCancel() {
+    setState(() => _isPressed = false);
+    _pressController.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MotionSpec.shouldReduceMotion(context);
+
+    Widget card = Card(
+      margin: EdgeInsets.zero,
+      shape: widget.isToxic
           ? RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppSpacing.cardBorderRadius),
               side: BorderSide(
-                color: theme.colorScheme.error,
+                color: widget.theme.colorScheme.error,
                 width: 2,
               ),
             )
           : null,
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        onTap: widget.onTap,
+        onTapDown: reduceMotion ? null : _handleTapDown,
+        onTapUp: reduceMotion ? null : _handleTapUp,
+        onTapCancel: reduceMotion ? null : _handleTapCancel,
+        borderRadius: BorderRadius.circular(AppSpacing.cardBorderRadius),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: AppSpacing.paddingDf,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Video info row
+              // Video info row with Hero for avatar
               Row(
                 children: [
                   // Video thumbnail placeholder
@@ -49,32 +186,32 @@ class CommentCard extends StatelessWidget {
                     width: 80,
                     height: 45,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      color: widget.theme.colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppSpacing.sm),
                     ),
                     child: Icon(
                       Icons.play_circle_outline,
-                      color: theme.colorScheme.primary,
+                      color: widget.theme.colorScheme.primary,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          comment.videoTitle,
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          widget.comment.videoTitle,
+                          style: widget.theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w500,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
+                        SizedBox(height: 2),
                         Text(
-                          comment.channelName,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.secondary,
+                          widget.comment.channelName,
+                          style: widget.theme.textTheme.bodySmall?.copyWith(
+                            color: widget.theme.colorScheme.secondary,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -82,69 +219,64 @@ class CommentCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(
-                      comment.isBookmarked
-                          ? Icons.bookmark
-                          : Icons.bookmark_border,
-                      color: comment.isBookmarked
-                          ? theme.colorScheme.primary
-                          : null,
-                    ),
-                    onPressed: onBookmarkTap,
+                  // Animated bookmark icon
+                  _AnimatedBookmarkButton(
+                    isBookmarked: widget.comment.isBookmarked,
+                    onTap: widget.onBookmarkTap,
+                    primaryColor: widget.theme.colorScheme.primary,
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppSpacing.md),
               const Divider(height: 1),
-              const SizedBox(height: 12),
-              // Sentiment badge row (if enabled and available)
-              if (showSentimentBadge && comment.sentimentLabel != null) ...[
+              SizedBox(height: AppSpacing.md),
+              // Sentiment badge row
+              if (widget.showSentimentBadge && widget.comment.sentimentLabel != null) ...[
                 Row(
                   children: [
                     _SentimentBadge(
-                      label: comment.sentimentLabel!,
-                      score: comment.sentimentScore,
+                      label: widget.comment.sentimentLabel!,
+                      score: widget.comment.sentimentScore,
                     ),
-                    if (isToxic) ...[
-                      const SizedBox(width: 8),
-                      _ToxicWarningBadge(score: comment.toxicScore),
+                    if (widget.isToxic) ...[
+                      SizedBox(width: AppSpacing.sm),
+                      _ToxicWarningBadge(score: widget.comment.toxicScore),
                     ],
-                    if (comment.needsReply == true) ...[
-                      const SizedBox(width: 8),
+                    if (widget.comment.needsReply == true) ...[
+                      SizedBox(width: AppSpacing.sm),
                       _NeedsReplyBadge(),
                     ],
                   ],
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: AppSpacing.sm),
               ],
               // Comment text
               Text(
-                comment.text,
-                style: theme.textTheme.bodyMedium,
+                widget.comment.text,
+                style: widget.theme.textTheme.bodyMedium,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppSpacing.md),
               // Stats row
               Row(
                 children: [
                   _buildStatItem(
                     context,
                     Icons.thumb_up_outlined,
-                    comment.likeCount.toString(),
+                    widget.comment.likeCount.toString(),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: AppSpacing.df),
                   _buildStatItem(
                     context,
                     Icons.comment_outlined,
-                    comment.replyCount.toString(),
+                    widget.comment.replyCount.toString(),
                   ),
                   const Spacer(),
                   Text(
-                    _formatDate(comment.publishedAt),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.secondary.withValues(alpha: 0.7),
+                    _formatDate(widget.comment.publishedAt),
+                    style: widget.theme.textTheme.bodySmall?.copyWith(
+                      color: widget.theme.colorScheme.secondary.withValues(alpha: 0.7),
                     ),
                   ),
                 ],
@@ -154,23 +286,37 @@ class CommentCard extends StatelessWidget {
         ),
       ),
     );
+
+    if (reduceMotion) {
+      return card;
+    }
+
+    return AnimatedBuilder(
+      animation: _scaleAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _scaleAnimation.value,
+          child: child,
+        );
+      },
+      child: card,
+    );
   }
 
   Widget _buildStatItem(BuildContext context, IconData icon, String value) {
-    final theme = Theme.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
           icon,
-          size: 16,
-          color: theme.colorScheme.secondary.withValues(alpha: 0.7),
+          size: AppSpacing.iconSizeSmall,
+          color: widget.theme.colorScheme.secondary.withValues(alpha: 0.7),
         ),
-        const SizedBox(width: 4),
+        SizedBox(width: AppSpacing.xs),
         Text(
           value,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.secondary.withValues(alpha: 0.7),
+          style: widget.theme.textTheme.bodySmall?.copyWith(
+            color: widget.theme.colorScheme.secondary.withValues(alpha: 0.7),
           ),
         ),
       ],
@@ -192,6 +338,106 @@ class CommentCard extends StatelessWidget {
     } else {
       return 'Just now';
     }
+  }
+}
+
+/// Animated bookmark button with bounce effect.
+class _AnimatedBookmarkButton extends StatefulWidget {
+  final bool isBookmarked;
+  final VoidCallback? onTap;
+  final Color primaryColor;
+
+  const _AnimatedBookmarkButton({
+    required this.isBookmarked,
+    this.onTap,
+    required this.primaryColor,
+  });
+
+  @override
+  State<_AnimatedBookmarkButton> createState() => _AnimatedBookmarkButtonState();
+}
+
+class _AnimatedBookmarkButtonState extends State<_AnimatedBookmarkButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: MotionSpec.durationMedium,
+    );
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 1.4),
+        weight: 40,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.4, end: 0.9),
+        weight: 30,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 0.9, end: 1.0),
+        weight: 30,
+      ),
+    ]).animate(CurvedAnimation(
+      parent: _controller,
+      curve: MotionSpec.curveEmphasized,
+    ));
+  }
+
+  @override
+  void didUpdateWidget(_AnimatedBookmarkButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isBookmarked && !oldWidget.isBookmarked) {
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MotionSpec.shouldReduceMotion(context);
+    
+    Widget icon = AnimatedSwitcher(
+      duration: reduceMotion ? Duration.zero : MotionSpec.durationShort,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
+      child: Icon(
+        widget.isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+        key: ValueKey(widget.isBookmarked),
+        color: widget.isBookmarked ? widget.primaryColor : null,
+      ),
+    );
+
+    if (!reduceMotion) {
+      icon = AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scaleAnimation.value,
+            child: child,
+          );
+        },
+        child: icon,
+      );
+    }
+
+    return IconButton(
+      icon: icon,
+      onPressed: widget.onTap,
+    );
   }
 }
 
