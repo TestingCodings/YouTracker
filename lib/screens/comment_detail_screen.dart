@@ -4,10 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import '../models/models.dart';
 import '../providers/providers.dart';
-import '../theme/motion_spec.dart';
+import '../src/design_tokens.dart';
+import '../widgets/bookmark_button.dart';
 import '../widgets/widgets.dart';
 
-/// Screen showing details of a specific comment with Hero animation support.
+/// Screen showing details of a specific comment.
+/// Uses Hero animations for smooth transitions from the comment list.
 class CommentDetailScreen extends ConsumerWidget {
   final String commentId;
 
@@ -84,100 +86,53 @@ class _CommentDetailContent extends ConsumerWidget {
         ref.watch(commentInteractionsProvider(comment.id));
     final reduceMotion = MotionSpec.shouldReduceMotion(context);
 
-    return CustomScrollView(
-      physics: const AlwaysScrollableScrollPhysics(
-        parent: BouncingScrollPhysics(),
-      ),
-      slivers: [
-        // Sliver app bar
-        SliverAppBar(
-          expandedHeight: 100,
-          floating: false,
-          pinned: true,
-          stretch: true,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.share_outlined),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Share - Coming soon')),
-                );
-              },
-            ),
-          ],
-          flexibleSpace: FlexibleSpaceBar(
-            stretchModes: const [
-              StretchMode.zoomBackground,
-              StretchMode.fadeTitle,
-            ],
-            centerTitle: false,
-            titlePadding: EdgeInsets.only(
-              left: AppSpacing.df + 48, // Account for back button
-              bottom: AppSpacing.df,
-            ),
-            title: Text(
-              'Comment Details',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-            background: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    theme.colorScheme.primary.withValues(alpha: 0.06),
-                    theme.colorScheme.surface,
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-
-        // Content
-        SliverPadding(
-          padding: AppSpacing.paddingDf,
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              // Video info card
-              _buildVideoInfoCard(theme),
-              SizedBox(height: AppSpacing.df),
-
-              // Comment card with Hero
-              _buildCommentCard(context, ref, theme, reduceMotion),
-              SizedBox(height: AppSpacing.lg),
-
-              // Interactions section
-              Text(
-                'Recent Activity',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              SizedBox(height: AppSpacing.md),
-
-              interactionsAsync.when(
-                data: (interactions) => _buildInteractionsCard(
-                  context,
-                  theme,
-                  interactions,
-                ),
-                loading: () => Card(
-                  child: Padding(
-                    padding: AppSpacing.paddingLg,
-                    child: const LoadingIndicator(),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(Spacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Video info card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(Spacing.lg),
+              child: Row(
+                children: [
+                  // Video thumbnail placeholder
+                  Container(
+                    width: 120,
+                    height: 68,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(Radii.md),
+                    ),
+                    child: Icon(
+                      Icons.play_circle_outline,
+                      color: theme.colorScheme.primary,
+                      size: 40,
+                    ),
                   ),
-                ),
-                error: (error, _) => Card(
-                  child: Padding(
-                    padding: AppSpacing.paddingLg,
-                    child: Text('Error loading activity: $error'),
+                  const SizedBox(width: Spacing.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          comment.videoTitle,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: Spacing.xs),
+                        Text(
+                          comment.channelName,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -188,177 +143,138 @@ class _CommentDetailContent extends ConsumerWidget {
               SizedBox(height: AppSpacing.xl),
             ]),
           ),
-        ),
-      ],
-    );
-  }
+          const SizedBox(height: Spacing.lg),
 
-  Widget _buildVideoInfoCard(ThemeData theme) {
-    return Card(
-      child: Padding(
-        padding: AppSpacing.paddingDf,
-        child: Row(
-          children: [
-            // Video thumbnail placeholder
-            Container(
-              width: 120,
-              height: 68,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppSpacing.sm),
-              ),
-              child: Icon(
-                Icons.play_circle_outline,
-                color: theme.colorScheme.primary,
-                size: 40,
-              ),
-            ),
-            SizedBox(width: AppSpacing.df),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    comment.videoTitle,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: AppSpacing.xs),
-                  Text(
-                    comment.channelName,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.secondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCommentCard(
-    BuildContext context,
-    WidgetRef ref,
-    ThemeData theme,
-    bool reduceMotion,
-  ) {
-    Widget cardContent = Card(
-      child: Padding(
-        padding: AppSpacing.paddingDf,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Author info with Hero for avatar
-            Row(
-              children: [
-                // Hero-wrapped avatar
-                Hero(
-                  tag: 'comment-avatar-${comment.id}',
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundColor:
-                        theme.colorScheme.primary.withValues(alpha: 0.1),
-                    child: Text(
-                      comment.authorName[0].toUpperCase(),
-                      style: TextStyle(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: AppSpacing.md),
-                Expanded(
+          // Comment card - wrapped with Hero for transition
+          Hero(
+            tag: 'comment-${comment.id}',
+            flightShuttleBuilder: _heroFlightShuttleBuilder,
+            child: Material(
+              type: MaterialType.transparency,
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(Spacing.lg),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        comment.authorName,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      // Author info with Hero avatar
+                      Row(
+                        children: [
+                          // Avatar with Hero
+                          Hero(
+                            tag: 'avatar-${comment.id}',
+                            child: CircleAvatar(
+                              radius: 20,
+                              backgroundColor:
+                                  theme.colorScheme.primary.withValues(alpha: 0.1),
+                              child: Text(
+                                comment.authorName[0].toUpperCase(),
+                                style: TextStyle(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: Spacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  comment.authorName,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  _formatDate(comment.publishedAt),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.secondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Animated bookmark button
+                          AnimatedBookmarkButton(
+                            isBookmarked: comment.isBookmarked,
+                            onPressed: () {
+                              ref
+                                  .read(commentsProvider.notifier)
+                                  .toggleBookmark(comment.id);
+                            },
+                            primaryColor: theme.colorScheme.primary,
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: Spacing.lg),
+                      const Divider(),
+                      const SizedBox(height: Spacing.lg),
+
+                      // Comment text
                       Text(
-                        _formatDate(comment.publishedAt),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.secondary,
-                        ),
+                        comment.text,
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                      const SizedBox(height: Spacing.lg),
+
+                      // Stats
+                      Row(
+                        children: [
+                          _buildStatChip(
+                            context,
+                            Icons.thumb_up,
+                            '${comment.likeCount} likes',
+                          ),
+                          const SizedBox(width: Spacing.md),
+                          _buildStatChip(
+                            context,
+                            Icons.comment,
+                            '${comment.replyCount} replies',
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                AnimatedToggleIconButton(
-                  inactiveIcon: Icons.bookmark_border,
-                  activeIcon: Icons.bookmark,
-                  isActive: comment.isBookmarked,
-                  activeColor: theme.colorScheme.primary,
-                  onChanged: (isActive) {
-                    ref
-                        .read(commentsProvider.notifier)
-                        .toggleBookmark(comment.id);
-                  },
-                ),
-              ],
+              ),
             ),
-            SizedBox(height: AppSpacing.df),
-            const Divider(),
-            SizedBox(height: AppSpacing.df),
+          ),
+          const SizedBox(height: Spacing.xl),
 
             // Comment text
             Text(
               comment.text,
               style: theme.textTheme.bodyLarge,
             ),
-            SizedBox(height: AppSpacing.df),
+          ),
+          const SizedBox(height: Spacing.md),
 
-            // Stats with animated appearance
-            Row(
-              children: [
-                _buildStatChip(
-                  context,
-                  Icons.thumb_up,
-                  '${comment.likeCount} likes',
-                ),
-                SizedBox(width: AppSpacing.md),
-                _buildStatChip(
-                  context,
-                  Icons.comment,
-                  '${comment.replyCount} replies',
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-
-    // Wrap entire card with Hero for smooth transition
-    if (!reduceMotion) {
-      cardContent = Hero(
-        tag: 'comment-${comment.id}',
-        flightShuttleBuilder: (
-          BuildContext flightContext,
-          Animation<double> animation,
-          HeroFlightDirection flightDirection,
-          BuildContext fromHeroContext,
-          BuildContext toHeroContext,
-        ) {
-          return Material(
-            color: Colors.transparent,
-            child: AnimatedBuilder(
-              animation: animation,
-              builder: (context, child) {
-                return Container(
-                  decoration: BoxDecoration(
-                    color: theme.cardColor,
-                    borderRadius: BorderRadius.circular(
-                      AppSpacing.cardBorderRadius,
+          interactionsAsync.when(
+            data: (interactions) {
+              if (interactions.isEmpty) {
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(Spacing.xl),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.timeline_outlined,
+                            size: 48,
+                            color: theme.colorScheme.secondary
+                                .withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(height: Spacing.md),
+                          Text(
+                            'No recent activity',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.secondary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -401,19 +317,22 @@ class _CommentDetailContent extends ConsumerWidget {
                   size: 48,
                   color: theme.colorScheme.secondary.withValues(alpha: 0.5),
                 ),
-                SizedBox(height: AppSpacing.md),
-                Text(
-                  'No recent activity',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.secondary,
-                  ),
-                ),
-              ],
+              );
+            },
+            loading: () => const Card(
+              child: Padding(
+                padding: EdgeInsets.all(Spacing.xl),
+                child: LoadingIndicator(),
+              ),
+            ),
+            error: (error, _) => Card(
+              child: Padding(
+                padding: const EdgeInsets.all(Spacing.xl),
+                child: Text('Error loading activity: $error'),
+              ),
             ),
           ),
-        ),
-      );
-    }
+          const SizedBox(height: Spacing.xl),
 
     return Card(
       child: ListView.separated(
@@ -450,16 +369,47 @@ class _CommentDetailContent extends ConsumerWidget {
     );
   }
 
+  /// Custom flight shuttle builder for smooth hero transitions.
+  Widget _heroFlightShuttleBuilder(
+    BuildContext flightContext,
+    Animation<double> animation,
+    HeroFlightDirection flightDirection,
+    BuildContext fromHeroContext,
+    BuildContext toHeroContext,
+  ) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        // Animate border radius during transition
+        final borderRadius = BorderRadiusTween(
+          begin: BorderRadius.circular(Radii.lg),
+          end: BorderRadius.circular(Radii.lg),
+        ).evaluate(animation)!;
+
+        return ClipRRect(
+          borderRadius: borderRadius,
+          child: Material(
+            elevation: Tween<double>(begin: 2.0, end: 0.0).evaluate(animation),
+            borderRadius: borderRadius,
+            child: flightDirection == HeroFlightDirection.pop
+                ? fromHeroContext.widget
+                : toHeroContext.widget,
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildStatChip(BuildContext context, IconData icon, String label) {
     final theme = Theme.of(context);
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm - 2,
+      padding: const EdgeInsets.symmetric(
+        horizontal: Spacing.md,
+        vertical: Spacing.sm - 2,
       ),
       decoration: BoxDecoration(
         color: theme.colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppSpacing.chipBorderRadius),
+        borderRadius: BorderRadius.circular(Radii.xl),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -469,7 +419,7 @@ class _CommentDetailContent extends ConsumerWidget {
             size: AppSpacing.iconSizeSmall,
             color: theme.colorScheme.primary,
           ),
-          SizedBox(width: AppSpacing.sm - 2),
+          const SizedBox(width: Spacing.sm - 2),
           Text(
             label,
             style: theme.textTheme.bodySmall?.copyWith(

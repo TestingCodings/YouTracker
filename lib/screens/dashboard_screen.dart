@@ -3,13 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/providers.dart';
+import '../src/design_tokens.dart';
 import '../src/providers/sync_status_provider.dart';
 import '../src/ui/widgets/sync_status_indicator.dart';
 import '../theme/motion_spec.dart';
 import '../widgets/widgets.dart';
 
-/// Dashboard screen showing comments with search and pagination.
-/// Uses sliver-based scrolling for better performance and UX.
+/// Dashboard screen showing comments with sliver-based scrolling.
+/// Uses CustomScrollView with SliverAppBar for smooth, stretchy scroll effects.
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
@@ -30,6 +31,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     });
   }
 
+  Future<void> _handleRefresh() async {
+    // Trigger sync and refresh comments
+    final syncNotifier = ref.read(syncStatusProvider.notifier);
+    await syncNotifier.syncNow();
+    await ref.read(commentsProvider.notifier).refresh();
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -43,51 +51,33 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: () async {
-          // Trigger sync and refresh comments
-          final syncNotifier = ref.read(syncStatusProvider.notifier);
-          await syncNotifier.syncNow();
-          await ref.read(commentsProvider.notifier).refresh();
-        },
+        onRefresh: _handleRefresh,
         edgeOffset: kToolbarHeight + MediaQuery.of(context).padding.top,
         child: CustomScrollView(
-          controller: _scrollController,
           physics: const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics(),
           ),
           slivers: [
-            // Sliver app bar with stretch effect
+            // Sliver App Bar with stretch effect
             SliverAppBar(
-              expandedHeight: 120,
+              expandedHeight: 120.0,
               floating: false,
               pinned: true,
               stretch: true,
-              backgroundColor: theme.colorScheme.surface,
-              surfaceTintColor: Colors.transparent,
               flexibleSpace: FlexibleSpaceBar(
+                title: const Text('YouTracker'),
                 stretchModes: const [
                   StretchMode.zoomBackground,
                   StretchMode.fadeTitle,
                 ],
-                centerTitle: false,
-                titlePadding: const EdgeInsets.only(
-                  left: AppSpacing.df,
-                  bottom: AppSpacing.df,
-                ),
-                title: Text(
-                  'YouTracker',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
                 background: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        theme.colorScheme.primary.withValues(alpha: 0.08),
-                        theme.colorScheme.surface,
+                        Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                        Theme.of(context).colorScheme.surface,
                       ],
                     ),
                   ),
@@ -116,7 +106,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ],
             ),
 
-            // Search bar
+            // Search bar as sliver
             SliverToBoxAdapter(
               child: SearchBarWidget(
                 initialValue: commentsState.searchQuery,
@@ -129,50 +119,39 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ),
 
-            // Stats row
+            // Stats row as sliver
             SliverToBoxAdapter(
               child: _buildStatsRow(commentsState),
             ),
 
-            // Comments list
-            _buildCommentsSliverList(commentsState),
-
-            // Pagination controls
-            if (commentsState.totalPages > 1)
-              SliverToBoxAdapter(
-                child: PaginationControls(
-                  currentPage: commentsState.currentPage,
-                  totalPages: commentsState.totalPages,
-                  hasNextPage: commentsState.hasNextPage,
-                  hasPreviousPage: commentsState.hasPreviousPage,
-                  isLoading: commentsState.isLoading,
-                  onNextPage: () {
-                    ref.read(commentsProvider.notifier).nextPage();
-                    // Scroll to top after page change
-                    _scrollController.animateTo(
-                      0,
-                      duration: MotionSpec.durationMedium,
-                      curve: MotionSpec.curveStandard,
-                    );
-                  },
-                  onPreviousPage: () {
-                    ref.read(commentsProvider.notifier).previousPage();
-                    _scrollController.animateTo(
-                      0,
-                      duration: MotionSpec.durationMedium,
-                      curve: MotionSpec.curveStandard,
-                    );
-                  },
-                ),
-              ),
+            // Comments list as sliver
+            _buildCommentsSliver(commentsState),
 
             // Bottom padding
-            const SliverToBoxAdapter(
-              child: SizedBox(height: AppSpacing.xl),
+            const SliverPadding(
+              padding: EdgeInsets.only(bottom: Spacing.lg),
             ),
           ],
         ),
       ),
+      // Pagination controls at bottom
+      bottomNavigationBar: commentsState.totalPages > 1
+          ? SafeArea(
+              child: PaginationControls(
+                currentPage: commentsState.currentPage,
+                totalPages: commentsState.totalPages,
+                hasNextPage: commentsState.hasNextPage,
+                hasPreviousPage: commentsState.hasPreviousPage,
+                isLoading: commentsState.isLoading,
+                onNextPage: () {
+                  ref.read(commentsProvider.notifier).nextPage();
+                },
+                onPreviousPage: () {
+                  ref.read(commentsProvider.notifier).previousPage();
+                },
+              ),
+            )
+          : null,
     );
   }
 
@@ -180,11 +159,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final theme = Theme.of(context);
     final reduceMotion = MotionSpec.shouldReduceMotion(context);
 
-    return AnimatedContainer(
-      duration: reduceMotion ? Duration.zero : MotionSpec.durationShort,
-      padding: EdgeInsets.symmetric(
-        horizontal: AppSpacing.df,
-        vertical: AppSpacing.sm,
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Spacing.lg,
+        vertical: Spacing.sm,
       ),
       child: Row(
         children: [
@@ -216,7 +194,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildCommentsSliverList(CommentsState state) {
+  Widget _buildCommentsSliver(CommentsState state) {
     if (state.isLoading && state.comments.isEmpty) {
       return const SliverFillRemaining(
         child: LoadingIndicator(message: 'Loading comments...'),
@@ -248,21 +226,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       );
     }
 
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final comment = state.comments[index];
-          return CommentCard(
-            comment: comment,
-            onTap: () {
-              context.push('/comment/${comment.id}');
-            },
-            onBookmarkTap: () {
-              ref.read(commentsProvider.notifier).toggleBookmark(comment.id);
-            },
-          );
-        },
-        childCount: state.comments.length,
+    return SliverPadding(
+      padding: const EdgeInsets.only(top: Spacing.sm),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final comment = state.comments[index];
+            return CommentCard(
+              comment: comment,
+              onTap: () {
+                context.push('/comment/${comment.id}');
+              },
+              onBookmarkTap: () {
+                ref.read(commentsProvider.notifier).toggleBookmark(comment.id);
+              },
+            );
+          },
+          childCount: state.comments.length,
+        ),
       ),
     );
   }
@@ -272,7 +253,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.lg)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Radii.xl)),
       ),
       builder: (context) => const _NotificationsBottomSheet(),
     );
