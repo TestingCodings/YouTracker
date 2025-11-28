@@ -486,6 +486,114 @@ Platform setup will require:
    - Enable YouTube Data API v3 in Google Cloud Console
    - Add required scopes to OAuth consent screen
 
+## Security
+
+YouTracker implements several security measures to protect user data and prevent unauthorized access.
+
+### Secure Token Storage
+
+OAuth tokens and secrets are stored securely using platform-specific mechanisms:
+- **iOS**: Keychain with `first_unlock` accessibility
+- **Android**: EncryptedSharedPreferences
+
+Use the `SecureStorage` class for storing sensitive data:
+
+```dart
+import 'package:you_tracker/src/security/security.dart';
+
+final storage = SecureStorage();
+await storage.storeTokens(
+  accessToken: token,
+  refreshToken: refresh,
+  expiry: expiryDate,
+);
+```
+
+### Encrypted Local Storage
+
+Hive boxes containing sensitive data can be encrypted using `HiveCryptoHelper`:
+
+```dart
+import 'package:you_tracker/src/security/security.dart';
+
+final helper = HiveCryptoHelper();
+await helper.initialize();
+
+final box = await helper.openEncryptedBox<String>('sensitive_data');
+```
+
+The encryption key is automatically generated and stored in secure storage. **Never commit encryption keys to version control.**
+
+### Environment Configuration
+
+Use environment-specific configuration to separate development, staging, and production settings:
+
+```dart
+import 'package:you_tracker/src/config/config.dart';
+
+// Initialize at app startup
+await Environment.initialize(EnvironmentType.production);
+
+// Access configuration
+final apiUrl = Environment.apiBaseUrl;
+final isDebug = Environment.isDebugMode;
+```
+
+For production builds, pass configuration via `--dart-define`:
+
+```bash
+flutter build apk --release \
+  --dart-define=ENV=production \
+  --dart-define=API_BASE_URL=https://api.example.com
+```
+
+See [Environment Configuration](.env.example) for all available options.
+
+### Logging with Redaction
+
+All logging automatically redacts sensitive data:
+
+```dart
+import 'package:you_tracker/src/logging/logging.dart';
+
+final logger = AppLogger('MyService');
+logger.info('User logged in', {
+  'userId': 'user_123',
+  'accessToken': 'secret', // Automatically redacted
+});
+```
+
+### Backend Token Exchange
+
+For maximum security, use the backend token exchange pattern:
+
+1. Client sends OAuth authorization code to your backend
+2. Backend exchanges code for tokens and stores them securely
+3. Backend issues short-lived session token to client
+4. Client uses session token for authenticated requests
+
+See `lib/src/security/backend_token_exchange.dart` for implementation guidance.
+
+### Build Hardening
+
+For production builds, enable obfuscation and symbol stripping:
+
+```bash
+flutter build apk --release \
+  --obfuscate \
+  --split-debug-info=build/debug-symbols/
+```
+
+See [BUILD-HARDENING.md](docs/BUILD-HARDENING.md) for complete build security documentation.
+
+### Security Best Practices
+
+1. **Never commit secrets**: Use `.env.example` as a template and add actual `.env` files to `.gitignore`
+2. **Use HTTPS**: All API calls should use HTTPS in production
+3. **Enable certificate pinning**: For additional security in production
+4. **Rotate tokens regularly**: Implement token refresh and rotation
+5. **Audit logging**: Use structured logging to track security events
+
 ## License
 
 This project is open source and available under the MIT License.
