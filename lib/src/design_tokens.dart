@@ -1,6 +1,5 @@
 /// Design tokens for consistent spacing and sizing throughout the app.
 /// These tokens follow an 8pt grid system.
-library;
 
 /// Spacing tokens based on an 8pt grid system.
 class Spacing {

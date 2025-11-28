@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 /// Motion specification constants for consistent animations.
 /// Respects reduced motion accessibility settings.
-library;
 
 /// Animation durations for consistent timing.
 class MotionDurations {
