@@ -6,6 +6,7 @@ import '../providers/providers.dart';
 import '../src/design_tokens.dart';
 import '../src/providers/sync_status_provider.dart';
 import '../src/ui/widgets/sync_status_indicator.dart';
+import '../theme/motion_spec.dart';
 import '../widgets/widgets.dart';
 
 /// Dashboard screen showing comments with sliver-based scrolling.
@@ -18,6 +19,8 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -36,8 +39,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final commentsState = ref.watch(commentsProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
       body: RefreshIndicator(
@@ -147,6 +157,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildStatsRow(CommentsState state) {
     final theme = Theme.of(context);
+    final reduceMotion = MotionSpec.shouldReduceMotion(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -155,20 +166,28 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
       child: Row(
         children: [
-          Text(
-            '${state.totalItems} comments',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.secondary,
+          AnimatedSwitcher(
+            duration: reduceMotion ? Duration.zero : MotionSpec.durationShort,
+            child: Text(
+              '${state.totalItems} comments',
+              key: ValueKey(state.totalItems),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.secondary,
+              ),
             ),
           ),
           const Spacer(),
           if (state.searchQuery.isNotEmpty)
-            Chip(
-              label: Text('Search: ${state.searchQuery}'),
-              deleteIcon: const Icon(Icons.close, size: 16),
-              onDeleted: () {
-                ref.read(commentsProvider.notifier).clearSearch();
-              },
+            AnimatedOpacity(
+              opacity: state.searchQuery.isNotEmpty ? 1.0 : 0.0,
+              duration: reduceMotion ? Duration.zero : MotionSpec.durationShort,
+              child: Chip(
+                label: Text('Search: ${state.searchQuery}'),
+                deleteIcon: const Icon(Icons.close, size: 16),
+                onDeleted: () {
+                  ref.read(commentsProvider.notifier).clearSearch();
+                },
+              ),
             ),
         ],
       ),
@@ -274,7 +293,7 @@ class _NotificationsBottomSheetState
           children: [
             // Handle
             Container(
-              margin: const EdgeInsets.only(top: 8),
+              margin: EdgeInsets.only(top: AppSpacing.sm),
               width: 40,
               height: 4,
               decoration: BoxDecoration(
@@ -284,14 +303,14 @@ class _NotificationsBottomSheetState
             ),
             // Header
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: AppSpacing.paddingDf,
               child: Row(
                 children: [
                   Text(
                     'Notifications',
                     style: theme.textTheme.titleLarge,
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: AppSpacing.sm),
                   if (interactionsState.unreadCount > 0)
                     Badge(
                       label: Text('${interactionsState.unreadCount}'),

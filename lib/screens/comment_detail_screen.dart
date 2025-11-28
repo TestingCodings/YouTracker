@@ -21,38 +21,49 @@ class CommentDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final commentAsync = ref.watch(commentDetailProvider(commentId));
+    final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Comment Details'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Share - Coming soon')),
-              );
-            },
-          ),
-        ],
-      ),
       body: commentAsync.when(
         data: (comment) {
           if (comment == null) {
-            return const ErrorMessage(
-              message: 'Comment not found',
+            return Scaffold(
+              appBar: AppBar(
+                title: const Text('Comment Details'),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => context.pop(),
+                ),
+              ),
+              body: const ErrorMessage(
+                message: 'Comment not found',
+              ),
             );
           }
-          return _CommentDetailContent(comment: comment);
+          return _CommentDetailContent(comment: comment, commentId: commentId);
         },
-        loading: () => const LoadingIndicator(message: 'Loading comment...'),
-        error: (error, _) => ErrorMessage(
-          message: error.toString(),
-          onRetry: () => ref.invalidate(commentDetailProvider(commentId)),
+        loading: () => Scaffold(
+          appBar: AppBar(
+            title: const Text('Comment Details'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.pop(),
+            ),
+          ),
+          body: const LoadingIndicator(message: 'Loading comment...'),
+        ),
+        error: (error, _) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Comment Details'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.pop(),
+            ),
+          ),
+          body: ErrorMessage(
+            message: error.toString(),
+            onRetry: () => ref.invalidate(commentDetailProvider(commentId)),
+          ),
         ),
       ),
     );
@@ -61,14 +72,19 @@ class CommentDetailScreen extends ConsumerWidget {
 
 class _CommentDetailContent extends ConsumerWidget {
   final Comment comment;
+  final String commentId;
 
-  const _CommentDetailContent({required this.comment});
+  const _CommentDetailContent({
+    required this.comment,
+    required this.commentId,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final interactionsAsync =
         ref.watch(commentInteractionsProvider(comment.id));
+    final reduceMotion = MotionSpec.shouldReduceMotion(context);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(Spacing.lg),
@@ -118,9 +134,14 @@ class _CommentDetailContent extends ConsumerWidget {
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+              SizedBox(height: AppSpacing.lg),
+
+              // Actions
+              _buildActionsRow(context, theme),
+              SizedBox(height: AppSpacing.xl),
+            ]),
           ),
           const SizedBox(height: Spacing.lg),
 
@@ -222,11 +243,10 @@ class _CommentDetailContent extends ConsumerWidget {
           ),
           const SizedBox(height: Spacing.xl),
 
-          // Interactions section
-          Text(
-            'Recent Activity',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
+            // Comment text
+            Text(
+              comment.text,
+              style: theme.textTheme.bodyLarge,
             ),
           ),
           const SizedBox(height: Spacing.md),
@@ -256,21 +276,46 @@ class _CommentDetailContent extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.shadowColor.withValues(
+                          alpha: 0.15 * animation.value,
+                        ),
+                        blurRadius: 12 * animation.value,
+                        offset: Offset(0, 4 * animation.value),
+                      ),
+                    ],
                   ),
+                  child: child,
                 );
-              }
+              },
+              child: cardContent,
+            ),
+          );
+        },
+        child: cardContent,
+      );
+    }
 
-              return Card(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: interactions.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    return InteractionTile(
-                      interaction: interactions[index],
-                    );
-                  },
+    return cardContent;
+  }
+
+  Widget _buildInteractionsCard(
+    BuildContext context,
+    ThemeData theme,
+    List<Interaction> interactions,
+  ) {
+    if (interactions.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: AppSpacing.paddingLg,
+          child: Center(
+            child: Column(
+              children: [
+                Icon(
+                  Icons.timeline_outlined,
+                  size: 48,
+                  color: theme.colorScheme.secondary.withValues(alpha: 0.5),
                 ),
               );
             },
@@ -289,26 +334,38 @@ class _CommentDetailContent extends ConsumerWidget {
           ),
           const SizedBox(height: Spacing.xl),
 
-          // Actions
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('View on YouTube - Coming soon'),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('View on YouTube'),
-                ),
-              ),
-            ],
-          ),
-        ],
+    return Card(
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: interactions.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          return InteractionTile(
+            interaction: interactions[index],
+          );
+        },
       ),
+    );
+  }
+
+  Widget _buildActionsRow(BuildContext context, ThemeData theme) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('View on YouTube - Coming soon'),
+                ),
+              );
+            },
+            icon: const Icon(Icons.open_in_new),
+            label: const Text('View on YouTube'),
+          ),
+        ),
+      ],
     );
   }
 
@@ -359,7 +416,7 @@ class _CommentDetailContent extends ConsumerWidget {
         children: [
           Icon(
             icon,
-            size: 16,
+            size: AppSpacing.iconSizeSmall,
             color: theme.colorScheme.primary,
           ),
           const SizedBox(width: Spacing.sm - 2),

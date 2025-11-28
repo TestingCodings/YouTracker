@@ -28,6 +28,7 @@ class CommentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isToxic = comment.isToxic ?? false;
+    final reduceMotion = MotionSpec.shouldReduceMotion(context);
 
     Widget cardContent = Card(
       margin: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.sm),
@@ -35,7 +36,7 @@ class CommentCard extends StatelessWidget {
           ? RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(Radii.lg),
               side: BorderSide(
-                color: theme.colorScheme.error,
+                color: widget.theme.colorScheme.error,
                 width: 2,
               ),
             )
@@ -48,7 +49,7 @@ class CommentCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Video info row
+              // Video info row with Hero for avatar
               Row(
                 children: [
                   // Video thumbnail placeholder
@@ -61,7 +62,7 @@ class CommentCard extends StatelessWidget {
                     ),
                     child: Icon(
                       Icons.play_circle_outline,
-                      color: theme.colorScheme.primary,
+                      color: widget.theme.colorScheme.primary,
                     ),
                   ),
                   const SizedBox(width: Spacing.md),
@@ -70,18 +71,18 @@ class CommentCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          comment.videoTitle,
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          widget.comment.videoTitle,
+                          style: widget.theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w500,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
+                        SizedBox(height: 2),
                         Text(
-                          comment.channelName,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.secondary,
+                          widget.comment.channelName,
+                          style: widget.theme.textTheme.bodySmall?.copyWith(
+                            color: widget.theme.colorScheme.secondary,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -105,8 +106,8 @@ class CommentCard extends StatelessWidget {
                 Row(
                   children: [
                     _SentimentBadge(
-                      label: comment.sentimentLabel!,
-                      score: comment.sentimentScore,
+                      label: widget.comment.sentimentLabel!,
+                      score: widget.comment.sentimentScore,
                     ),
                     if (isToxic) ...[
                       const SizedBox(width: Spacing.sm),
@@ -122,8 +123,8 @@ class CommentCard extends StatelessWidget {
               ],
               // Comment text
               Text(
-                comment.text,
-                style: theme.textTheme.bodyMedium,
+                widget.comment.text,
+                style: widget.theme.textTheme.bodyMedium,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -134,19 +135,19 @@ class CommentCard extends StatelessWidget {
                   _buildStatItem(
                     context,
                     Icons.thumb_up_outlined,
-                    comment.likeCount.toString(),
+                    widget.comment.likeCount.toString(),
                   ),
                   const SizedBox(width: Spacing.lg),
                   _buildStatItem(
                     context,
                     Icons.comment_outlined,
-                    comment.replyCount.toString(),
+                    widget.comment.replyCount.toString(),
                   ),
                   const Spacer(),
                   Text(
-                    _formatDate(comment.publishedAt),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.secondary.withValues(alpha: 0.7),
+                    _formatDate(widget.comment.publishedAt),
+                    style: widget.theme.textTheme.bodySmall?.copyWith(
+                      color: widget.theme.colorScheme.secondary.withValues(alpha: 0.7),
                     ),
                   ),
                 ],
@@ -204,20 +205,19 @@ class CommentCard extends StatelessWidget {
   }
 
   Widget _buildStatItem(BuildContext context, IconData icon, String value) {
-    final theme = Theme.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
           icon,
-          size: 16,
-          color: theme.colorScheme.secondary.withValues(alpha: 0.7),
+          size: AppSpacing.iconSizeSmall,
+          color: widget.theme.colorScheme.secondary.withValues(alpha: 0.7),
         ),
-        const SizedBox(width: 4),
+        SizedBox(width: AppSpacing.xs),
         Text(
           value,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.secondary.withValues(alpha: 0.7),
+          style: widget.theme.textTheme.bodySmall?.copyWith(
+            color: widget.theme.colorScheme.secondary.withValues(alpha: 0.7),
           ),
         ),
       ],
@@ -239,6 +239,106 @@ class CommentCard extends StatelessWidget {
     } else {
       return 'Just now';
     }
+  }
+}
+
+/// Animated bookmark button with bounce effect.
+class _AnimatedBookmarkButton extends StatefulWidget {
+  final bool isBookmarked;
+  final VoidCallback? onTap;
+  final Color primaryColor;
+
+  const _AnimatedBookmarkButton({
+    required this.isBookmarked,
+    this.onTap,
+    required this.primaryColor,
+  });
+
+  @override
+  State<_AnimatedBookmarkButton> createState() => _AnimatedBookmarkButtonState();
+}
+
+class _AnimatedBookmarkButtonState extends State<_AnimatedBookmarkButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: MotionSpec.durationMedium,
+    );
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 1.4),
+        weight: 40,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.4, end: 0.9),
+        weight: 30,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 0.9, end: 1.0),
+        weight: 30,
+      ),
+    ]).animate(CurvedAnimation(
+      parent: _controller,
+      curve: MotionSpec.curveEmphasized,
+    ));
+  }
+
+  @override
+  void didUpdateWidget(_AnimatedBookmarkButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isBookmarked && !oldWidget.isBookmarked) {
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MotionSpec.shouldReduceMotion(context);
+    
+    Widget icon = AnimatedSwitcher(
+      duration: reduceMotion ? Duration.zero : MotionSpec.durationShort,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
+      child: Icon(
+        widget.isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+        key: ValueKey(widget.isBookmarked),
+        color: widget.isBookmarked ? widget.primaryColor : null,
+      ),
+    );
+
+    if (!reduceMotion) {
+      icon = AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scaleAnimation.value,
+            child: child,
+          );
+        },
+        child: icon,
+      );
+    }
+
+    return IconButton(
+      icon: icon,
+      onPressed: widget.onTap,
+    );
   }
 }
 
