@@ -33,13 +33,20 @@ class CommentAdapter extends TypeAdapter<Comment> {
       authorName: fields[13] as String,
       authorProfileImageUrl: fields[14] as String?,
       isBookmarked: fields[15] as bool,
+      sentimentScore: fields[16] as double?,
+      sentimentLabel: fields[17] as String?,
+      toxicScore: fields[18] as double?,
+      isToxic: fields[19] as bool?,
+      needsReply: fields[20] as bool?,
+      sentimentAnalyzedAt: fields[21] as DateTime?,
+      sentimentProvider: fields[22] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Comment obj) {
     writer
-      ..writeByte(16)
+      ..writeByte(23)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -71,7 +78,21 @@ class CommentAdapter extends TypeAdapter<Comment> {
       ..writeByte(14)
       ..write(obj.authorProfileImageUrl)
       ..writeByte(15)
-      ..write(obj.isBookmarked);
+      ..write(obj.isBookmarked)
+      ..writeByte(16)
+      ..write(obj.sentimentScore)
+      ..writeByte(17)
+      ..write(obj.sentimentLabel)
+      ..writeByte(18)
+      ..write(obj.toxicScore)
+      ..writeByte(19)
+      ..write(obj.isToxic)
+      ..writeByte(20)
+      ..write(obj.needsReply)
+      ..writeByte(21)
+      ..write(obj.sentimentAnalyzedAt)
+      ..writeByte(22)
+      ..write(obj.sentimentProvider);
   }
 
   @override

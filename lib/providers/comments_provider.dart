@@ -3,6 +3,36 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 
+/// Filter type for comments based on sentiment.
+enum CommentSentimentFilter {
+  all,
+  positive,
+  negative,
+  neutral,
+  questions,
+  needsReply,
+  toxic;
+
+  String get displayName {
+    switch (this) {
+      case CommentSentimentFilter.all:
+        return 'All';
+      case CommentSentimentFilter.positive:
+        return 'Positive';
+      case CommentSentimentFilter.negative:
+        return 'Negative';
+      case CommentSentimentFilter.neutral:
+        return 'Neutral';
+      case CommentSentimentFilter.questions:
+        return 'Questions';
+      case CommentSentimentFilter.needsReply:
+        return 'Needs Reply';
+      case CommentSentimentFilter.toxic:
+        return 'Toxic';
+    }
+  }
+}
+
 /// Provider for comments with pagination and search support.
 final commentsProvider =
     StateNotifierProvider<CommentsNotifier, CommentsState>((ref) {
@@ -19,6 +49,7 @@ class CommentsState {
   final bool isLoading;
   final String? error;
   final String searchQuery;
+  final CommentSentimentFilter sentimentFilter;
 
   CommentsState({
     this.comments = const [],
@@ -30,7 +61,33 @@ class CommentsState {
     this.isLoading = false,
     this.error,
     this.searchQuery = '',
+    this.sentimentFilter = CommentSentimentFilter.all,
   });
+
+  /// Returns filtered comments based on sentiment filter.
+  List<Comment> get filteredComments {
+    if (sentimentFilter == CommentSentimentFilter.all) {
+      return comments;
+    }
+    return comments.where((comment) {
+      switch (sentimentFilter) {
+        case CommentSentimentFilter.all:
+          return true;
+        case CommentSentimentFilter.positive:
+          return comment.sentimentLabel?.toLowerCase() == 'positive';
+        case CommentSentimentFilter.negative:
+          return comment.sentimentLabel?.toLowerCase() == 'negative';
+        case CommentSentimentFilter.neutral:
+          return comment.sentimentLabel?.toLowerCase() == 'neutral';
+        case CommentSentimentFilter.questions:
+          return comment.sentimentLabel?.toLowerCase() == 'question';
+        case CommentSentimentFilter.needsReply:
+          return comment.needsReply == true;
+        case CommentSentimentFilter.toxic:
+          return comment.isToxic == true;
+      }
+    }).toList();
+  }
 
   CommentsState copyWith({
     List<Comment>? comments,
@@ -42,6 +99,7 @@ class CommentsState {
     bool? isLoading,
     String? error,
     String? searchQuery,
+    CommentSentimentFilter? sentimentFilter,
   }) {
     return CommentsState(
       comments: comments ?? this.comments,
@@ -53,6 +111,7 @@ class CommentsState {
       isLoading: isLoading ?? this.isLoading,
       error: error,
       searchQuery: searchQuery ?? this.searchQuery,
+      sentimentFilter: sentimentFilter ?? this.sentimentFilter,
     );
   }
 }
@@ -140,6 +199,16 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
+  }
+
+  /// Sets the sentiment filter.
+  void setSentimentFilter(CommentSentimentFilter filter) {
+    state = state.copyWith(sentimentFilter: filter);
+  }
+
+  /// Clears the sentiment filter.
+  void clearSentimentFilter() {
+    state = state.copyWith(sentimentFilter: CommentSentimentFilter.all);
   }
 }
 
