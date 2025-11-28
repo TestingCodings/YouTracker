@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../models/models.dart';
 import '../providers/providers.dart';
 import '../src/design_tokens.dart';
+import '../widgets/bookmark_button.dart';
 import '../widgets/widgets.dart';
 
 /// Screen showing details of a specific comment.
@@ -175,7 +176,7 @@ class _CommentDetailContent extends ConsumerWidget {
                             ),
                           ),
                           // Animated bookmark button
-                          _AnimatedBookmarkButton(
+                          AnimatedBookmarkButton(
                             isBookmarked: comment.isBookmarked,
                             onPressed: () {
                               ref
@@ -390,39 +391,5 @@ class _CommentDetailContent extends ConsumerWidget {
       'Dec',
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
-  }
-}
-
-/// Animated bookmark button with scale and icon transition.
-class _AnimatedBookmarkButton extends StatelessWidget {
-  final bool isBookmarked;
-  final VoidCallback? onPressed;
-  final Color primaryColor;
-
-  const _AnimatedBookmarkButton({
-    required this.isBookmarked,
-    this.onPressed,
-    required this.primaryColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onPressed,
-      icon: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
-        transitionBuilder: (child, animation) {
-          return ScaleTransition(
-            scale: animation,
-            child: child,
-          );
-        },
-        child: Icon(
-          isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-          key: ValueKey(isBookmarked),
-          color: isBookmarked ? primaryColor : null,
-        ),
-      ),
-    );
   }
 }
