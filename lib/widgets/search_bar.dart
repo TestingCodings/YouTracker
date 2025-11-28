@@ -231,16 +231,9 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
                   // Search icon / button
                   IconButton(
                     onPressed: _isExpanded ? null : _expand,
-                    icon: AnimatedSwitcher(
-                      duration: MotionSpec.getDuration(
-                        context,
-                        MotionDurations.short,
-                      ),
-                      child: Icon(
-                        _isExpanded ? Icons.search : Icons.search,
-                        key: ValueKey(_isExpanded),
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                      ),
+                    icon: Icon(
+                      Icons.search,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
 
