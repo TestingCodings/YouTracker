@@ -162,7 +162,7 @@ class LogEntry {
 /// ```
 class LogRedactor {
   /// Keys that should always be redacted (case-insensitive).
-  static const Set<String> _sensitiveKeys = {
+  static final Set<String> _sensitiveKeys = {
     'token',
     'access_token',
     'accessToken',
