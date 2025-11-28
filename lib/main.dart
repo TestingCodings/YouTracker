@@ -5,6 +5,8 @@ import 'providers/providers.dart';
 import 'routes/app_router.dart';
 import 'services/services.dart';
 import 'src/sync/sync_engine.dart';
+import 'storage/migrations/multi_channel_migration.dart';
+import 'store/channel_store.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -12,6 +14,12 @@ void main() async {
 
   // Initialize local storage
   await LocalStorageService.instance.initialize();
+
+  // Initialize channel store for multi-channel support
+  await ChannelStore.instance.initialize();
+  
+  // Run multi-channel migration
+  await MultiChannelMigration.run();
 
   // Initialize analytics service
   await AnalyticsService.instance.initialize();

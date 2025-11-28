@@ -7,6 +7,7 @@ import 'package:hive/hive.dart';
 import '../../models/models.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/youtube/youtube_data_service.dart';
+import '../../store/channel_store.dart';
 import 'conflict_resolver.dart';
 import 'hive_adapters.dart';
 import 'remote_delta_client.dart';
@@ -59,6 +60,7 @@ class SyncStatus {
   final String? lastError;
   final int pendingOperations;
   final int failedOperations;
+  final String? channelId;
 
   const SyncStatus({
     this.state = SyncState.idle,
@@ -67,6 +69,7 @@ class SyncStatus {
     this.lastError,
     this.pendingOperations = 0,
     this.failedOperations = 0,
+    this.channelId,
   });
 
   SyncStatus copyWith({
@@ -76,6 +79,7 @@ class SyncStatus {
     String? lastError,
     int? pendingOperations,
     int? failedOperations,
+    String? channelId,
   }) {
     return SyncStatus(
       state: state ?? this.state,
@@ -84,12 +88,13 @@ class SyncStatus {
       lastError: lastError ?? this.lastError,
       pendingOperations: pendingOperations ?? this.pendingOperations,
       failedOperations: failedOperations ?? this.failedOperations,
+      channelId: channelId ?? this.channelId,
     );
   }
 
   @override
   String toString() {
-    return 'SyncStatus(state: $state, progress: $progress, pending: $pendingOperations)';
+    return 'SyncStatus(state: $state, progress: $progress, pending: $pendingOperations, failed: $failedOperations, lastSyncedAt: $lastSyncedAt, lastError: $lastError, channelId: $channelId)';
   }
 }
 
@@ -101,6 +106,7 @@ class SyncResult {
   final int conflicts;
   final String? error;
   final DateTime timestamp;
+  final String? channelId;
 
   const SyncResult({
     required this.success,
@@ -109,15 +115,17 @@ class SyncResult {
     this.conflicts = 0,
     this.error,
     required this.timestamp,
+    this.channelId,
   });
 
   @override
   String toString() {
-    return 'SyncResult(success: $success, pushed: $itemsPushed, pulled: $itemsPulled, conflicts: $conflicts)';
+    return 'SyncResult(success: $success, pushed: $itemsPushed, pulled: $itemsPulled, conflicts: $conflicts, channelId: $channelId)';
   }
 }
 
 /// Main sync engine for bidirectional sync with offline-first support.
+/// Supports per-channel sync isolation.
 class SyncEngine {
   static SyncEngine? _instance;
 
@@ -153,15 +161,27 @@ class SyncEngine {
   Box<SyncableEntity>? _syncableEntityBox;
 
   bool _isInitialized = false;
-  bool _isSyncing = false;
+  
+  /// Per-channel sync states to prevent concurrent syncs on the same channel.
+  final Map<String, bool> _channelSyncInProgress = {};
+  
   Timer? _backgroundTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  StreamSubscription<ChannelChangeEvent>? _channelChangeSubscription;
 
   final _statusController = StreamController<SyncStatus>.broadcast();
   Stream<SyncStatus> get statusStream => _statusController.stream;
 
   SyncStatus _currentStatus = const SyncStatus();
   SyncStatus get currentStatus => _currentStatus;
+  
+  /// Per-channel status tracking.
+  final Map<String, SyncStatus> _channelStatuses = {};
+  
+  /// Gets status for a specific channel.
+  SyncStatus getChannelStatus(String channelId) {
+    return _channelStatuses[channelId] ?? const SyncStatus();
+  }
 
   /// Initializes the sync engine.
   Future<void> initialize({
@@ -191,6 +211,9 @@ class SyncEngine {
 
     // Setup connectivity monitoring
     _setupConnectivityMonitoring();
+    
+    // Setup channel change monitoring
+    _setupChannelChangeMonitoring();
 
     // Perform schema migration if needed
     await _performMigration();
@@ -231,12 +254,52 @@ class SyncEngine {
       final hasConnection = results.any((r) => r != ConnectivityResult.none);
 
       if (hasConnection && _config.syncOnReconnect) {
-        // Network reconnected - trigger sync
-        syncNow();
+        // Network reconnected - trigger sync for active channel
+        final activeChannel = ChannelStore.instance.activeChannel;
+        if (activeChannel != null) {
+          syncNow(channelId: activeChannel.id);
+        } else {
+          syncNow();
+        }
       } else if (!hasConnection) {
         _updateStatus(_currentStatus.copyWith(state: SyncState.offline));
       }
     });
+  }
+  
+  /// Debounce timer for channel change sync.
+  Timer? _channelChangeSyncDebounce;
+  
+  /// Minimum time since last sync before triggering a new sync on channel change.
+  static const Duration _channelSyncDebounceTime = Duration(seconds: 2);
+  static const Duration _minTimeSinceLastSync = Duration(minutes: 5);
+  
+  void _setupChannelChangeMonitoring() {
+    try {
+      if (ChannelStore.instance.isInitialized) {
+        _channelChangeSubscription = ChannelStore.instance.onChannelChange.listen((event) {
+          if (event.type == ChannelChangeType.activated) {
+            // Cancel any pending debounced sync
+            _channelChangeSyncDebounce?.cancel();
+            
+            // Debounce to handle rapid channel switching
+            _channelChangeSyncDebounce = Timer(_channelSyncDebounceTime, () {
+              // Only sync if not synced recently
+              final lastSync = getChannelStatus(event.channel.id).lastSyncedAt;
+              final shouldSync = lastSync == null || 
+                  DateTime.now().difference(lastSync) > _minTimeSinceLastSync;
+              
+              if (shouldSync) {
+                syncNow(channelId: event.channel.id);
+              }
+            });
+          }
+        });
+      }
+    } catch (e) {
+      // ChannelStore may not be initialized yet
+      debugPrint('Channel change monitoring not set up: $e');
+    }
   }
 
   Future<void> _performMigration() async {
@@ -279,9 +342,14 @@ class SyncEngine {
     required SyncOperationType opType,
     required SyncEntityType entityType,
     required String entityId,
+    String? channelId,
     Map<String, dynamic>? payload,
   }) async {
     _ensureInitialized();
+    
+    final effectiveChannelId = channelId ?? 
+        ChannelStore.instance.activeChannel?.id ?? 
+        defaultChannelId;
 
     // Update local syncable entity metadata
     final existing = _syncableEntityBox?.get(entityId);
@@ -293,12 +361,16 @@ class SyncEngine {
     );
     await _syncableEntityBox?.put(entityId, updated);
 
-    // Enqueue the operation
+    // Enqueue the operation with channel context
+    final payloadWithChannel = {
+      ...?payload,
+      'channelId': effectiveChannelId,
+    };
     await _syncQueue.enqueue(
       opType: opType,
       entityType: entityType,
       entityId: entityId,
-      payload: payload,
+      payload: payloadWithChannel,
     );
 
     _updateStatus(_currentStatus.copyWith(
@@ -307,53 +379,78 @@ class SyncEngine {
   }
 
   /// Performs an immediate foreground sync.
-  Future<SyncResult> syncNow() async {
+  /// If [channelId] is provided, syncs only that channel.
+  /// Otherwise, syncs the active channel.
+  Future<SyncResult> syncNow({String? channelId}) async {
     _ensureInitialized();
+    
+    final effectiveChannelId = channelId ?? 
+        ChannelStore.instance.activeChannel?.id ?? 
+        defaultChannelId;
 
-    if (_isSyncing) {
+    // Check if sync is already in progress for this channel
+    if (_channelSyncInProgress[effectiveChannelId] == true) {
       return SyncResult(
         success: false,
-        error: 'Sync already in progress',
+        error: 'Sync already in progress for channel $effectiveChannelId',
         timestamp: DateTime.now(),
+        channelId: effectiveChannelId,
       );
     }
 
-    _isSyncing = true;
-    _updateStatus(_currentStatus.copyWith(
+    _channelSyncInProgress[effectiveChannelId] = true;
+    _updateChannelStatus(effectiveChannelId, const SyncStatus().copyWith(
       state: SyncState.syncing,
       progress: 0.0,
+      channelId: effectiveChannelId,
     ));
 
     try {
       // Check connectivity
       final connectivityResult = await Connectivity().checkConnectivity();
       if (connectivityResult.every((r) => r == ConnectivityResult.none)) {
-        _updateStatus(_currentStatus.copyWith(state: SyncState.offline));
+        _updateChannelStatus(effectiveChannelId, getChannelStatus(effectiveChannelId).copyWith(
+          state: SyncState.offline,
+        ));
         return SyncResult(
           success: false,
           error: 'No network connection',
           timestamp: DateTime.now(),
+          channelId: effectiveChannelId,
         );
       }
 
-      // Push local changes
-      _updateStatus(_currentStatus.copyWith(progress: 0.1));
-      final pushResult = await _pushChanges();
+      // Push local changes for this channel
+      _updateChannelStatus(effectiveChannelId, getChannelStatus(effectiveChannelId).copyWith(
+        progress: 0.1,
+      ));
+      final pushResult = await _pushChanges(channelId: effectiveChannelId);
 
-      // Pull remote changes
-      _updateStatus(_currentStatus.copyWith(progress: 0.5));
-      final pullResult = await _pullChanges();
+      // Pull remote changes for this channel
+      _updateChannelStatus(effectiveChannelId, getChannelStatus(effectiveChannelId).copyWith(
+        progress: 0.5,
+      ));
+      final pullResult = await _pullChanges(channelId: effectiveChannelId);
 
       // Update metadata
-      await _updateSyncMetadata();
+      await _updateSyncMetadata(channelId: effectiveChannelId);
+      
+      // Update channel's last sync time in the store
+      try {
+        await ChannelStore.instance.updateLastSyncTime(effectiveChannelId);
+      } catch (e) {
+        debugPrint('Failed to update channel sync time: $e');
+      }
 
-      _updateStatus(SyncStatus(
+      final finalStatus = SyncStatus(
         state: SyncState.upToDate,
         progress: 1.0,
         lastSyncedAt: DateTime.now(),
         pendingOperations: _syncQueue.queueLength,
         failedOperations: _syncQueue.deadLetterLength,
-      ));
+        channelId: effectiveChannelId,
+      );
+      _updateChannelStatus(effectiveChannelId, finalStatus);
 
       return SyncResult(
         success: true,
@@ -361,55 +458,68 @@ class SyncEngine {
         itemsPulled: pullResult.itemsPulled,
         conflicts: pullResult.conflicts,
         timestamp: DateTime.now(),
+        channelId: effectiveChannelId,
       );
     } catch (e) {
-      _updateStatus(SyncStatus(
+      _updateChannelStatus(effectiveChannelId, SyncStatus(
         state: SyncState.error,
         lastError: e.toString(),
-        lastSyncedAt: _currentStatus.lastSyncedAt,
+        lastSyncedAt: getChannelStatus(effectiveChannelId).lastSyncedAt,
         pendingOperations: _syncQueue.queueLength,
         failedOperations: _syncQueue.deadLetterLength,
+        channelId: effectiveChannelId,
       ));
 
       return SyncResult(
         success: false,
         error: e.toString(),
         timestamp: DateTime.now(),
+        channelId: effectiveChannelId,
       );
     } finally {
-      _isSyncing = false;
+      _channelSyncInProgress[effectiveChannelId] = false;
     }
   }
 
-  /// Pushes local changes to remote.
-  Future<SyncResult> _pushChanges() async {
+  /// Pushes local changes to remote for a specific channel.
+  Future<SyncResult> _pushChanges({String? channelId}) async {
     final results = await _syncQueue.processAll();
+    
+    // Filter results by channel if specified
+    final channelResults = channelId != null
+        ? results.where((r) => r.operation.payload?['channelId'] == channelId).toList()
+        : results;
 
     return SyncResult(
-      success: results.every((r) => r.success),
-      itemsPushed: results.where((r) => r.success).length,
+      success: channelResults.every((r) => r.success),
+      itemsPushed: channelResults.where((r) => r.success).length,
       timestamp: DateTime.now(),
+      channelId: channelId,
     );
   }
 
-  /// Pulls remote changes and merges them locally.
-  Future<SyncResult> _pullChanges() async {
+  /// Pulls remote changes and merges them locally for a specific channel.
+  Future<SyncResult> _pullChanges({String? channelId}) async {
     if (!_deltaClient.isConnected) {
-      return SyncResult(success: true, timestamp: DateTime.now());
+      return SyncResult(success: true, timestamp: DateTime.now(), channelId: channelId);
     }
 
     final localStorage = LocalStorageService.instance;
-    final metadata = _metadataBox?.get('global');
+    final metadataKey = channelId != null ? 'channel_$channelId' : 'global';
+    final metadata = _metadataBox?.get(metadataKey);
     final lastSync = metadata?.lastIncrementalSyncTime ?? DateTime(2020);
 
     try {
       final channel = await _deltaClient.fetchChannel();
       if (channel == null) {
-        return SyncResult(success: true, timestamp: DateTime.now());
+        return SyncResult(success: true, timestamp: DateTime.now(), channelId: channelId);
       }
+      
+      // Use provided channelId or fall back to fetched channel
+      final effectiveChannelId = channelId ?? channel.id;
 
       final response = await _deltaClient.fetchCommentsUpdatedAfter(
-        channelId: channel.id,
+        channelId: effectiveChannelId,
         updatedAfter: lastSync,
       );
 
@@ -418,6 +528,7 @@ class SyncEngine {
           success: true,
           itemsPulled: 0,
           timestamp: DateTime.now(),
+          channelId: effectiveChannelId,
         );
       }
 
@@ -467,12 +578,14 @@ class SyncEngine {
         itemsPulled: response.items.length,
         conflicts: conflicts,
         timestamp: DateTime.now(),
+        channelId: effectiveChannelId,
       );
     } catch (e) {
       return SyncResult(
         success: false,
         error: e.toString(),
         timestamp: DateTime.now(),
+        channelId: channelId,
       );
     }
   }
@@ -515,12 +628,13 @@ class SyncEngine {
     }
   }
 
-  Future<void> _updateSyncMetadata() async {
-    final existing = _metadataBox?.get('global');
+  Future<void> _updateSyncMetadata({String? channelId}) async {
+    final metadataKey = channelId != null ? 'channel_$channelId' : 'global';
+    final existing = _metadataBox?.get(metadataKey);
     await _metadataBox?.put(
-      'global',
+      metadataKey,
       SyncMetadata(
-        key: 'global',
+        key: metadataKey,
         lastIncrementalSyncTime: DateTime.now(),
         lastFullSyncTime: existing?.lastFullSyncTime,
         syncCount: (existing?.syncCount ?? 0) + 1,
@@ -538,8 +652,11 @@ class SyncEngine {
 
     if (_config.enableBackgroundSync) {
       _backgroundTimer = Timer.periodic(_config.syncInterval, (_) {
-        if (!_isSyncing) {
-          syncNow();
+        // Sync only the active channel
+        final activeChannel = ChannelStore.instance.activeChannel;
+        if (activeChannel != null && 
+            _channelSyncInProgress[activeChannel.id] != true) {
+          syncNow(channelId: activeChannel.id);
         }
       });
     }
@@ -557,14 +674,24 @@ class SyncEngine {
   /// Gets the conflict resolver.
   ConflictResolver get conflictResolver => _conflictResolver;
 
-  DateTime? _getLastSyncTime() {
-    return _metadataBox?.get('global')?.lastIncrementalSyncTime;
+  DateTime? _getLastSyncTime({String? channelId}) {
+    final metadataKey = channelId != null ? 'channel_$channelId' : 'global';
+    return _metadataBox?.get(metadataKey)?.lastIncrementalSyncTime;
   }
 
   void _updateStatus(SyncStatus status) {
     _currentStatus = status;
     if (!_statusController.isClosed) {
       _statusController.add(status);
+    }
+  }
+  
+  void _updateChannelStatus(String channelId, SyncStatus status) {
+    _channelStatuses[channelId] = status;
+    // Also update the global status if this is the active channel
+    final activeChannel = ChannelStore.instance.activeChannel;
+    if (activeChannel?.id == channelId) {
+      _updateStatus(status);
     }
   }
 
@@ -577,7 +704,9 @@ class SyncEngine {
   /// Disposes all resources.
   Future<void> dispose() async {
     stopBackgroundSync();
+    _channelChangeSyncDebounce?.cancel();
     await _connectivitySubscription?.cancel();
+    await _channelChangeSubscription?.cancel();
     await _statusController.close();
     await _syncQueue.dispose();
     await _metadataBox?.close();
@@ -587,34 +716,40 @@ class SyncEngine {
 
   /// Resets the sync engine (for testing or recovery).
   Future<void> reset() async {
+    _channelChangeSyncDebounce?.cancel();
     await _syncQueue.clearAll();
     await _metadataBox?.clear();
     await _syncableEntityBox?.clear();
     _deltaClient.clearCache();
+    _channelStatuses.clear();
+    _channelSyncInProgress.clear();
     _updateStatus(const SyncStatus());
   }
 
   /// Forces a full sync, ignoring cached data.
-  Future<SyncResult> forceFullSync() async {
+  /// If [channelId] is provided, syncs only that channel.
+  Future<SyncResult> forceFullSync({String? channelId}) async {
     _ensureInitialized();
 
     // Clear delta caches
     _deltaClient.clearCache();
 
     // Clear incremental sync time to force full pull
-    final existing = _metadataBox?.get('global');
+    final metadataKey = channelId != null ? 'channel_$channelId' : 'global';
+    final existing = _metadataBox?.get(metadataKey);
     if (existing != null) {
       await _metadataBox?.put(
-        'global',
+        metadataKey,
         existing.copyWith(lastIncrementalSyncTime: DateTime(2020)),
       );
     }
 
-    return syncNow();
+    return syncNow(channelId: channelId);
   }
 
   /// Rebuilds local database from remote (recovery mode).
-  Future<SyncResult> rebuildFromRemote() async {
+  /// If [channelId] is provided, only rebuilds data for that channel.
+  Future<SyncResult> rebuildFromRemote({String? channelId}) async {
     _ensureInitialized();
 
     try {
@@ -624,12 +759,13 @@ class SyncEngine {
       await _syncableEntityBox?.clear();
 
       // Force full sync
-      return await forceFullSync();
+      return await forceFullSync(channelId: channelId);
     } catch (e) {
       return SyncResult(
         success: false,
         error: e.toString(),
         timestamp: DateTime.now(),
+        channelId: channelId,
       );
     }
   }
