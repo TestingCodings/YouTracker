@@ -38,6 +38,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             onTap: () => context.push('/sync-status'),
           ),
           IconButton(
+            icon: const Icon(Icons.analytics_outlined),
+            onPressed: () => context.push('/analytics'),
+            tooltip: 'Analytics Dashboard',
+          ),
+          IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () => _showNotificationsBottomSheet(context),
           ),

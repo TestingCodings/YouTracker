@@ -13,6 +13,9 @@ void main() async {
   // Initialize local storage
   await LocalStorageService.instance.initialize();
 
+  // Initialize analytics service
+  await AnalyticsService.instance.initialize();
+
   // Initialize sync engine (offline-first architecture)
   await SyncEngine.instance.initialize();
 
