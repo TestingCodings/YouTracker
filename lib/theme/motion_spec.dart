@@ -56,6 +56,22 @@ class MotionSpec {
 }
 
 /// Spacing constants following an 8pt grid system.
+/// 
+/// The 8pt grid is a design system that uses multiples of 8 as the base unit
+/// for all spacing and sizing. This creates visual consistency and rhythm
+/// throughout the UI while ensuring alignment across components.
+/// 
+/// Usage:
+/// ```dart
+/// Padding(
+///   padding: EdgeInsets.all(AppSpacing.df), // 16pt default padding
+///   child: ...
+/// )
+/// 
+/// SizedBox(height: AppSpacing.lg), // 24pt vertical spacing
+/// ```
+/// 
+/// The scale follows: xs(4) < sm(8) < md(12) < df(16) < lg(24) < xl(32) < xxl(48)
 class AppSpacing {
   AppSpacing._();
   
@@ -92,6 +108,9 @@ class AppSpacing {
   static const double iconSizeSmall = 16.0;
   static const double iconSizeMedium = 24.0;
   static const double iconSizeLarge = 32.0;
+  
+  /// Standard padding for interactive elements (buttons, icons)
+  static const double interactivePadding = 8.0;
   
   // Padding shortcuts
   static const EdgeInsets paddingXs = EdgeInsets.all(xs);

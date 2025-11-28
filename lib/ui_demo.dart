@@ -5,6 +5,14 @@ import 'models/models.dart';
 import 'theme/motion_spec.dart';
 import 'widgets/widgets.dart';
 
+/// Extension to format color as hex string.
+extension ColorHex on Color {
+  /// Returns the color as a hex string (e.g., '#FF0000').
+  String toHexString() {
+    return '#${value.toRadixString(16).substring(2).toUpperCase()}';
+  }
+}
+
 /// Demo page showcasing the new UI/UX improvements.
 /// This page is optional and does not change app entry points.
 /// 
@@ -251,7 +259,7 @@ class _UIDemoPageState extends ConsumerState<UIDemoPage>
 
   Widget _buildColorChip(String label, Color color) {
     return Tooltip(
-      message: '#${color.value.toRadixString(16).substring(2).toUpperCase()}',
+      message: color.toHexString(),
       child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
