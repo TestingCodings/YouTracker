@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../src/design_tokens.dart';
 import '../src/motion_spec.dart';
 
 /// Animated bookmark button with scale and icon transition.
@@ -22,7 +21,7 @@ class AnimatedBookmarkButton extends StatelessWidget {
     return IconButton(
       onPressed: onPressed,
       icon: AnimatedSwitcher(
-        duration: MotionDurations.medium,
+        duration: MotionSpec.getDuration(context, MotionDurations.medium),
         transitionBuilder: (child, animation) {
           return ScaleTransition(
             scale: animation,
