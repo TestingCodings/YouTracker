@@ -175,6 +175,24 @@ AppBar(
 )
 ```
 
+## Theme & Settings Per-Channel
+
+Theme and settings are automatically persisted and restored when switching channels:
+
+```dart
+// Theme is automatically applied when channel changes
+// The themeModeProvider and settingsProvider listen to channel changes
+
+// Theme switching is handled automatically via:
+// 1. ChannelStore emits ChannelChangeEvent when active channel changes
+// 2. ThemeModeNotifier listens for ChannelChangeType.activated events
+// 3. Theme is loaded from channel-scoped storage key
+
+// Manual theme setting (persisted per-channel)
+await ref.read(themeModeProvider.notifier).toggleTheme();
+await ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.dark);
+```
+
 ## Sync Engine Integration
 
 The sync engine supports per-channel sync:

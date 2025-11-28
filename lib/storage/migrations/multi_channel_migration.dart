@@ -78,6 +78,8 @@ class MultiChannelMigration {
       }
       
       // Create default channel from existing auth data
+      // Set initial state to disconnected - the auth service will verify 
+      // the actual connection state when the channel is used
       final defaultChannel = Channel(
         id: storedData.userId!,
         name: storedData.name ?? 'My Channel',
@@ -89,9 +91,11 @@ class MultiChannelMigration {
         userId: storedData.userId,
         isActive: true,
         tokenExpiresAt: storedData.expiry,
+        // Use disconnected as the initial state - the auth service will
+        // verify and update the actual connection state
         connectionState: storedData.isExpired 
             ? ChannelConnectionState.tokenExpired 
-            : ChannelConnectionState.connected,
+            : ChannelConnectionState.disconnected,
       );
       
       await ChannelStore.instance.addChannel(defaultChannel);

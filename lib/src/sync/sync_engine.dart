@@ -94,7 +94,7 @@ class SyncStatus {
 
   @override
   String toString() {
-    return 'SyncStatus(state: $state, progress: $progress, pending: $pendingOperations, channelId: $channelId)';
+    return 'SyncStatus(state: $state, progress: $progress, pending: $pendingOperations, failed: $failedOperations, lastSyncedAt: $lastSyncedAt, lastError: $lastError, channelId: $channelId)';
   }
 }
 
@@ -267,13 +267,32 @@ class SyncEngine {
     });
   }
   
+  /// Debounce timer for channel change sync.
+  Timer? _channelChangeSyncDebounce;
+  
+  /// Minimum time since last sync before triggering a new sync on channel change.
+  static const Duration _channelSyncDebounceTime = Duration(seconds: 2);
+  static const Duration _minTimeSinceLastSync = Duration(minutes: 5);
+  
   void _setupChannelChangeMonitoring() {
     try {
       if (ChannelStore.instance.isInitialized) {
         _channelChangeSubscription = ChannelStore.instance.onChannelChange.listen((event) {
           if (event.type == ChannelChangeType.activated) {
-            // Trigger sync for newly activated channel
-            syncNow(channelId: event.channel.id);
+            // Cancel any pending debounced sync
+            _channelChangeSyncDebounce?.cancel();
+            
+            // Debounce to handle rapid channel switching
+            _channelChangeSyncDebounce = Timer(_channelSyncDebounceTime, () {
+              // Only sync if not synced recently
+              final lastSync = getChannelStatus(event.channel.id).lastSyncedAt;
+              final shouldSync = lastSync == null || 
+                  DateTime.now().difference(lastSync) > _minTimeSinceLastSync;
+              
+              if (shouldSync) {
+                syncNow(channelId: event.channel.id);
+              }
+            });
           }
         });
       }
@@ -685,6 +704,7 @@ class SyncEngine {
   /// Disposes all resources.
   Future<void> dispose() async {
     stopBackgroundSync();
+    _channelChangeSyncDebounce?.cancel();
     await _connectivitySubscription?.cancel();
     await _channelChangeSubscription?.cancel();
     await _statusController.close();
@@ -696,6 +716,7 @@ class SyncEngine {
 
   /// Resets the sync engine (for testing or recovery).
   Future<void> reset() async {
+    _channelChangeSyncDebounce?.cancel();
     await _syncQueue.clearAll();
     await _metadataBox?.clear();
     await _syncableEntityBox?.clear();
